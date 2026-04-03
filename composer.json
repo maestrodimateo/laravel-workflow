@@ -1,0 +1,49 @@
+{
+    "name": "maestrodimateo/laravel-workflow",
+    "description": "Workflow engine for Laravel applications",
+    "type": "library",
+    "version": "1.0.0",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3 || ^8.4",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0",
+        "illuminate/events": "^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0",
+        "pestphp/pest": "^4.0",
+        "laravel/pint": "^1.29"
+    },
+    "autoload": {
+        "psr-4": {
+            "Maestrodimateo\\Workflow\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Maestrodimateo\\Workflow\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Maestrodimateo\\Workflow\\WorkflowServiceProvider",
+                "Maestrodimateo\\Workflow\\WorkflowEventServiceProvider"
+            ],
+            "aliases": {
+                "Workflow": "Maestrodimateo\\Workflow\\Facades\\Workflow"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}

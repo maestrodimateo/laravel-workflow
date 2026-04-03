@@ -1,0 +1,39 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Database\Eloquent\Model;
+use Maestrodimateo\Workflow\Contracts\TransitionAction;
+use Maestrodimateo\Workflow\Models\Basket;
+
+class {{ class }} implements TransitionAction
+{
+    /**
+     * Unique key for this action (stored in transition JSON config).
+     */
+    public static function key(): string
+    {
+        return '{{ key }}';
+    }
+
+    /**
+     * Human-readable label shown in the admin UI.
+     */
+    public static function label(): string
+    {
+        return '{{ label }}';
+    }
+
+    /**
+     * Execute the action during a transition.
+     *
+     * @param  Model  $model   The model being transitioned
+     * @param  Basket $from    Source basket
+     * @param  Basket $to      Target basket
+     * @param  array  $config  Configuration from the admin UI
+     */
+    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    {
+        //
+    }
+}
