@@ -15,9 +15,10 @@ Comes with a **built-in visual admin interface** to design your workflows by dra
 - **Facade & helper** — `Workflow::for($model)->transition($basketId)` or `workflow($model)->transition($basketId)`
 - **Role-based access** — define allowed roles per circuit and per basket
 - **Transition actions** — attach actions (email, webhook, log, custom) to specific transitions, configured visually
-- **Hooks** — `beforeTransition` / `afterTransition` for custom logic
 - **Duration tracking** — automatic timing between steps with human-readable formatting
 - **Full history** — every transition is logged with who, when, how long, and why
+- **Message templates** — WYSIWYG editor with variable interpolation
+- **Export / Import** — share workflows as JSON files + PNG image export
 - **Dark mode** — the admin UI supports light and dark themes
 - **Zero build step** — the admin UI uses Alpine.js + Tailwind CDN, no npm required
 
@@ -93,7 +94,6 @@ $options = Workflow::for($invoice)->nextBaskets();
 Workflow::for($invoice)->transition(
     $nextBasket->id,
     'Approved by manager',  // optional comment
-    [$userId],              // optional user assignment
 );
 ```
 
@@ -122,9 +122,8 @@ $wf = Workflow::for($model);
 |---|---|---|
 | `currentStatus()` | `?Basket` | Current basket (step) of the model |
 | `nextBaskets()` | `Collection` | Available baskets to transition to |
-| `transition($id, $comment, $users)` | `bool` | Move the model to the next basket |
+| `transition($id, $comment)` | `bool` | Move the model to the next basket |
 | `history()` | `Collection` | Full transition history with durations |
-| `assignedUsers()` | `Collection` | Users assigned in the current basket |
 | `totalDuration()` | `int` | Total processing time in seconds |
 | `durationInStatus($status)` | `int` | Time spent in a specific status (seconds) |
 
@@ -185,28 +184,6 @@ Human-readable formats: `45s`, `12min`, `2h 35min`, `3j 4h`.
 
 ---
 
-## Hooks
-
-Register callbacks in your `AppServiceProvider::boot()`:
-
-```php
-use Maestrodimateo\Workflow\Facades\Workflow;
-
-// Before — throw to abort the transition
-Workflow::beforeTransition(function ($model, $from, $to) {
-    if ($to->status === 'PUBLISHED' && ! $model->isComplete()) {
-        throw new \Exception('Incomplete document.');
-    }
-});
-
-// After — runs inside the DB transaction
-Workflow::afterTransition(function ($model, $from, $to, $comment) {
-    Notification::send($model->owner, new StatusChanged($to));
-});
-```
-
----
-
 ## Transition Actions
 
 Actions are executed automatically when a specific transition occurs. They are **configured visually** in the admin UI.
@@ -221,7 +198,13 @@ Actions are executed automatically when a specific transition occurs. They are *
 
 ### Custom actions
 
-Create a class implementing `TransitionAction`:
+Generate a new action with artisan:
+
+```bash
+php artisan make:workflow-action GeneratePdfAction
+```
+
+This creates `app/Actions/GeneratePdfAction.php`:
 
 ```php
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
@@ -229,11 +212,11 @@ use Maestrodimateo\Workflow\Contracts\TransitionAction;
 class GeneratePdfAction implements TransitionAction
 {
     public static function key(): string { return 'generate_pdf'; }
-    public static function label(): string { return 'Generate PDF'; }
+    public static function label(): string { return 'Generate Pdf'; }
 
     public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
     {
-        PdfGenerator::generate($model, $config['template'] ?? 'default');
+        // Your logic here
     }
 }
 ```
@@ -250,12 +233,13 @@ The action immediately appears in the admin UI's "Add action" menu on any transi
 
 ## Events
 
-A `TransitionEvent` is fired after every transition:
+A `TransitionEvent` is fired after every transition. Add your own listeners:
 
 ```php
 // In your EventServiceProvider
 protected $listen = [
     \Maestrodimateo\Workflow\Events\TransitionEvent::class => [
+        \App\Listeners\NotifySlack::class,
         \App\Listeners\SyncWithExternalSystem::class,
     ],
 ];
@@ -271,33 +255,83 @@ public function handle(TransitionEvent $event): void
 }
 ```
 
+### What happens during a transition
+
+```
+1. Model detached from current basket, attached to next
+2. Transition actions executed (configured visually on the link)
+3. TransitionEvent fired → HistoryListener records history with duration
+4. Your custom listeners run
+```
+
+---
+
+## Message Templates
+
+Messages are created at the circuit level and can be used in transition actions (e.g., `send_email`).
+
+The WYSIWYG editor supports **variable interpolation**:
+
+```
+Bonjour, la demande {{ reference }} a été transférée de {{ from_name }}
+vers {{ to_name }} par {{ user }} le {{ datetime }}.
+```
+
+### Built-in variables
+
+| Variable | Description |
+|---|---|
+| `{{ model_id }}` | Model identifier |
+| `{{ model_type }}` | Model class name |
+| `{{ from_status }}` / `{{ from_name }}` | Source basket |
+| `{{ to_status }}` / `{{ to_name }}` | Target basket |
+| `{{ circuit_name }}` | Circuit name |
+| `{{ date }}` / `{{ heure }}` / `{{ datetime }}` | Current date/time |
+| `{{ user }}` | User performing the transition |
+
+### Custom variables
+
+```php
+// config/workflow.php
+'message_variables' => [
+    'reference' => fn ($model) => $model->reference,
+    'montant'   => fn ($model) => number_format($model->amount, 2, ',', ' ') . ' €',
+],
+```
+
+---
+
+## Export / Import
+
+### In the admin UI
+
+- **Export JSON** — download the full circuit definition as a `.json` file
+- **Export PNG** — download a high-resolution image of the workflow diagram
+- **Import** — select a `.json` file to recreate a circuit with all its configuration
+
+### Via API
+
+```bash
+GET  /workflow/admin/api/circuits/{circuit}/export
+POST /workflow/admin/api/circuits/import  # multipart form, field: "file"
+```
+
 ---
 
 ## Configuration
 
 ```php
 // config/workflow.php
-
 return [
     'routes' => [
-        'prefix'           => 'workflow',      // URL prefix for all routes
-        'middleware'        => ['api'],          // Middleware for the public API
-        'admin_middleware'  => ['web'],          // Middleware for the admin UI
+        'prefix'           => 'workflow',
+        'middleware'        => ['api'],
+        'admin_middleware'  => ['web'],
     ],
-
-    'auth_identifier' => 'id', // User attribute stored in history.done_by
+    'auth_identifier' => 'id',
+    'message_variables' => [],
 ];
 ```
-
-### Routes
-
-| Route | Description |
-|---|---|
-| `GET /workflow/admin` | Visual workflow designer |
-| `GET /workflow/circuits` | List circuits (API) |
-| `POST /workflow/circuits` | Create circuit (API) |
-| `POST /workflow/baskets` | Create basket (API) |
-| `POST /workflow/baskets/move` | Transition a model (API) |
 
 ---
 
@@ -306,80 +340,13 @@ return [
 The trait adds these methods directly on your model:
 
 ```php
-$invoice->baskets;            // All baskets (status history)
-$invoice->histories;          // All history entries
-$invoice->assignedUsers;      // Assigned users
-$invoice->currentStatus();    // Current basket
-$invoice->workflowFeatures(); // Eager-load workflow relations
+$invoice->baskets;          // All baskets (status history)
+$invoice->histories;        // All history entries
+$invoice->currentStatus();  // Current basket
 
 // Scope: models in a specific basket
 Invoice::fromBasket($basket)->get();
 ```
-
----
-
-## Export / Import
-
-Workflows can be exported as JSON files and imported on another environment or shared between projects.
-
-### In the admin UI
-
-- **Export** — click the download icon next to a circuit in the header. A `.json` file is downloaded containing the full circuit definition (baskets, transitions, actions, messages, roles).
-- **Import** — in the circuit dropdown, click "Importer un circuit" and select a `.json` file. The circuit is recreated with all its configuration.
-
-### Via API
-
-```bash
-# Export
-GET /workflow/admin/api/circuits/{circuit}/export
-
-# Import (multipart form with a "file" field)
-POST /workflow/admin/api/circuits/import
-```
-
-### JSON format
-
-```json
-{
-    "_format": "laravel-workflow/v1",
-    "circuit": {
-        "name": "Invoice Approval",
-        "targetModel": "App\\Models\\Invoice",
-        "description": "Approval workflow for invoices",
-        "roles": ["admin", "manager", "accountant"]
-    },
-    "baskets": [
-        {
-            "_ref": "uuid-1",
-            "name": "Draft",
-            "status": "DRAFT",
-            "color": "#30638E",
-            "roles": ["admin", "manager"],
-            "transitions": [
-                {
-                    "_to_ref": "uuid-2",
-                    "label": "Submit for review",
-                    "actions": [
-                        { "type": "send_email", "config": { "message_id": "uuid-msg" } },
-                        { "type": "log", "config": { "message": "Submitted" } }
-                    ]
-                }
-            ]
-        }
-    ],
-    "messages": [
-        {
-            "subject": "Invoice submitted",
-            "content": "<p>Your invoice has been submitted.</p>",
-            "type": "email",
-            "recipient": "subject",
-            "_basket_ref": "uuid-1"
-        }
-    ]
-}
-```
-
-Imported circuits are created with `(import)` appended to the name to avoid conflicts. UUIDs are regenerated — only the structure is preserved.
 
 ---
 
@@ -391,7 +358,9 @@ The visual designer at `/workflow/admin` provides:
 - **Drag-and-drop canvas** — position baskets freely, auto-layout button
 - **Visual linking** — click output port, then click target basket to create transitions
 - **Transition config** — click a link to add label and actions
-- **Message editor** — WYSIWYG editor for notification templates
+- **Message editor** — WYSIWYG editor with variable interpolation
+- **Export / Import** — JSON + PNG export, JSON import
+- **Zoom** — scroll wheel + controls
 - **Dark mode** — toggle between light and dark themes
 - **No build step** — works out of the box, powered by Alpine.js + Tailwind CDN
 
