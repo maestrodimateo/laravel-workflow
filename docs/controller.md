@@ -1,221 +1,268 @@
 # Integrating Workflow into Your Controllers
 
-This guide shows how to connect the package to your Laravel controllers. The package does not provide an application-level controller — that's your responsibility, because every project has its own permissions, validation, and response needs.
+The package auto-discovers all models that use the `Workflowable` trait via `Circuit.targetModel`. You don't need to list them anywhere — just create a single generic controller that works with any workflowable model.
 
 ---
 
-## Simple Controller
-
-One controller per model. The most straightforward approach.
+## Generic Workflow Controller
 
 ```php
-use Maestrodimateo\Workflow\Facades\Workflow;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
+use Maestrodimateo\Workflow\Facades\Workflow;
+use Maestrodimateo\Workflow\Models\Circuit;
 
-class InvoiceWorkflowController extends Controller
+class WorkflowController extends Controller
 {
-    public function status(Invoice $invoice)
+    /**
+     * Get the workflow status of any model.
+     *
+     * GET /workflow/{type}/{id}/status
+     * GET /workflow/{type}/{id}/status?circuit_id=uuid  (multi-circuit)
+     */
+    public function status(Request $request, string $type, string $id)
     {
-        $wf = Workflow::for($invoice);
+        $model = $this->resolve($type, $id);
+        $wf = $this->scoped($request, $model);
 
         return response()->json([
-            'current_status' => $wf->currentStatus(),
-            'next_steps'     => $wf->nextBaskets(),
-            'is_locked'      => $wf->isLocked(),
-            'locked_by'      => $wf->lockedBy(),
+            'status'   => $wf->currentStatus(),
+            'next'     => $wf->nextBaskets(),
+            'locked'   => $wf->isLocked(),
+            'lockedBy' => $wf->lockedBy(),
         ]);
     }
 
-    public function transition(Request $request, Invoice $invoice)
+    /**
+     * Get all statuses across circuits.
+     *
+     * GET /workflow/{type}/{id}/circuits
+     */
+    public function circuits(string $type, string $id)
     {
+        $model = $this->resolve($type, $id);
+
+        return response()->json([
+            'statuses' => Workflow::for($model)->allStatuses(),
+            'circuits' => Workflow::for($model)->circuits(),
+        ]);
+    }
+
+    /**
+     * Transition to a new basket.
+     *
+     * POST /workflow/{type}/{id}/transition
+     * Body: { basket_id, comment?, circuit_id? }
+     */
+    public function transition(Request $request, string $type, string $id)
+    {
+        $model = $this->resolve($type, $id);
+
         $request->validate([
-            'basket_id' => 'required|uuid',
-            'comment'   => 'nullable|string|max:255',
+            'basket_id'  => 'required|uuid',
+            'comment'    => 'nullable|string|max:255',
+            'circuit_id' => 'nullable|uuid',
         ]);
 
         try {
-            Workflow::for($invoice)->transition(
+            $this->scoped($request, $model)->transition(
                 $request->basket_id,
                 $request->comment,
             );
 
-            return back()->with('success', 'Status updated');
-        } catch (ModelLockedException $e) {
-            return back()->withErrors(['lock' => $e->getMessage()]);
-        }
-    }
-
-    public function lock(Invoice $invoice)
-    {
-        try {
-            Workflow::for($invoice)->lock();
-            return response()->json(['message' => 'Model locked']);
+            return response()->json(['message' => 'Status updated']);
         } catch (ModelLockedException $e) {
             return response()->json(['error' => $e->getMessage()], 423);
         }
     }
 
-    public function unlock(Invoice $invoice)
+    /**
+     * Lock the model for exclusive access.
+     *
+     * POST /workflow/{type}/{id}/lock
+     */
+    public function lock(string $type, string $id)
     {
-        Workflow::for($invoice)->unlock();
-        return response()->json(['message' => 'Model unlocked']);
+        $model = $this->resolve($type, $id);
+
+        try {
+            $lock = Workflow::for($model)->lock();
+            return response()->json(['message' => 'Locked', 'expires_at' => $lock->expires_at]);
+        } catch (ModelLockedException $e) {
+            return response()->json(['error' => $e->getMessage()], 423);
+        }
     }
 
-    public function history(Invoice $invoice)
+    /**
+     * Release the lock.
+     *
+     * DELETE /workflow/{type}/{id}/lock
+     */
+    public function unlock(string $type, string $id)
     {
+        $model = $this->resolve($type, $id);
+        Workflow::for($model)->unlock();
+
+        return response()->json(['message' => 'Unlocked']);
+    }
+
+    /**
+     * Get the transition history.
+     *
+     * GET /workflow/{type}/{id}/history
+     */
+    public function history(Request $request, string $type, string $id)
+    {
+        $model = $this->resolve($type, $id);
+
         return response()->json([
-            'history'        => Workflow::for($invoice)->history(),
-            'total_duration' => Workflow::for($invoice)->totalDuration(),
+            'history'  => $this->scoped($request, $model)->history(),
+            'duration' => $this->scoped($request, $model)->totalDuration(),
         ]);
+    }
+
+    /**
+     * Get required documents for a transition.
+     *
+     * GET /workflow/{type}/{id}/requirements/{basketId}
+     */
+    public function requirements(Request $request, string $type, string $id, string $basketId)
+    {
+        $model = $this->resolve($type, $id);
+
+        return response()->json(
+            $this->scoped($request, $model)->requiredDocuments($basketId)
+        );
+    }
+
+    /**
+     * Resolve a model from its short type name and ID.
+     *
+     * The type is matched against Circuit.targetModel — no manual mapping needed.
+     * "invoice" matches App\Models\Invoice, "leave-request" matches App\Models\LeaveRequest, etc.
+     */
+    private function resolve(string $type, string $id): Model
+    {
+        $className = $this->resolveClassName($type);
+
+        abort_unless($className, 404, "No workflow model found for type [{$type}]");
+
+        return $className::findOrFail($id);
+    }
+
+    /**
+     * Find the model class from a short type name by looking at existing circuits.
+     *
+     * "invoice"       → App\Models\Invoice       (if a circuit targets it)
+     * "leave-request" → App\Models\LeaveRequest   (if a circuit targets it)
+     */
+    private function resolveClassName(string $type): ?string
+    {
+        $normalized = str($type)->studly()->toString();
+
+        return Circuit::query()
+            ->pluck('targetModel')
+            ->first(fn (string $class) => class_basename($class) === $normalized);
+    }
+
+    /**
+     * Apply circuit scoping if circuit_id is provided.
+     */
+    private function scoped(Request $request, Model $model): \Maestrodimateo\Workflow\WorkflowManager
+    {
+        $wf = Workflow::for($model);
+
+        if ($request->filled('circuit_id')) {
+            $wf = $wf->in($request->circuit_id);
+        }
+
+        return $wf;
     }
 }
 ```
 
-Routes:
+---
+
+## Routes
 
 ```php
-Route::prefix('invoices/{invoice}/workflow')->group(function () {
-    Route::get('/status', [InvoiceWorkflowController::class, 'status']);
-    Route::post('/transition', [InvoiceWorkflowController::class, 'transition']);
-    Route::post('/lock', [InvoiceWorkflowController::class, 'lock']);
-    Route::delete('/lock', [InvoiceWorkflowController::class, 'unlock']);
-    Route::get('/history', [InvoiceWorkflowController::class, 'history']);
+Route::prefix('workflow/{type}/{id}')->group(function () {
+    Route::get('/status', [WorkflowController::class, 'status']);
+    Route::get('/circuits', [WorkflowController::class, 'circuits']);
+    Route::post('/transition', [WorkflowController::class, 'transition']);
+    Route::post('/lock', [WorkflowController::class, 'lock']);
+    Route::delete('/lock', [WorkflowController::class, 'unlock']);
+    Route::get('/history', [WorkflowController::class, 'history']);
+    Route::get('/requirements/{basketId}', [WorkflowController::class, 'requirements']);
 });
 ```
 
 ---
 
-## Multi-Circuit Controller
+## Usage
 
-If your model belongs to multiple circuits, pass the circuit ID:
-
-```php
-class InvoiceWorkflowController extends Controller
-{
-    public function status(Request $request, Invoice $invoice)
-    {
-        $circuitId = $request->query('circuit_id');
-
-        if ($circuitId) {
-            $wf = Workflow::for($invoice)->in($circuitId);
-
-            return response()->json([
-                'circuit'  => $circuitId,
-                'status'   => $wf->currentStatus(),
-                'next'     => $wf->nextBaskets(),
-            ]);
-        }
-
-        return response()->json([
-            'statuses' => Workflow::for($invoice)->allStatuses(),
-            'circuits' => Workflow::for($invoice)->circuits(),
-        ]);
-    }
-
-    public function transition(Request $request, Invoice $invoice)
-    {
-        $request->validate([
-            'basket_id'  => 'required|uuid',
-            'circuit_id' => 'required|uuid',
-            'comment'    => 'nullable|string|max:255',
-        ]);
-
-        Workflow::for($invoice)
-            ->in($request->circuit_id)
-            ->transition($request->basket_id, $request->comment);
-
-        return back()->with('success', 'Status updated');
-    }
-}
 ```
+GET    /workflow/invoice/uuid-123/status
+GET    /workflow/invoice/uuid-123/status?circuit_id=uuid-circuit
+GET    /workflow/invoice/uuid-123/circuits
+POST   /workflow/invoice/uuid-123/transition       { basket_id, comment?, circuit_id? }
+POST   /workflow/leave-request/uuid-456/lock
+DELETE /workflow/leave-request/uuid-456/lock
+GET    /workflow/purchase-order/uuid-789/history
+GET    /workflow/invoice/uuid-123/requirements/uuid-basket
+```
+
+The `{type}` parameter is automatically resolved to the model class by matching against `Circuit.targetModel`. For example, if a circuit targets `App\Models\Invoice`, the type `invoice` resolves to that class. No configuration needed — if the model uses `Workflowable` and has a circuit, it works.
 
 ---
 
-## Displaying Requirements Before a Transition
+## Adding Permissions
 
-If `require_document` actions are configured on a transition, show them to the user:
+The controller above has no authorization. Add your own middleware or policy checks:
 
 ```php
-class InvoiceWorkflowController extends Controller
-{
-    public function nextSteps(Invoice $invoice)
-    {
-        $wf = Workflow::for($invoice);
-
-        $steps = $wf->nextBaskets()->map(fn ($basket) => [
-            'basket'    => $basket,
-            'label'     => $basket->pivot->label,
-            'documents' => $wf->requiredDocuments($basket->id),
-        ]);
-
-        return response()->json($steps);
-    }
-}
+Route::prefix('workflow/{type}/{id}')
+    ->middleware(['auth:sanctum'])
+    ->group(function () {
+        // ...
+    });
 ```
 
-In a Blade view:
+Or inside the controller:
 
-```blade
-@foreach ($steps as $step)
-    <div class="border rounded p-4">
-        <h3>{{ $step['basket']->name }}</h3>
+```php
+public function transition(Request $request, string $type, string $id)
+{
+    $model = $this->resolve($type, $id);
 
-        @foreach ($step['documents'] as $doc)
-            <p>
-                {{ $doc['label'] }}
-                @if ($invoice->documents()->where('type', $doc['type'])->exists())
-                    <span class="text-green-600">✓</span>
-                @else
-                    <span class="text-red-600">missing</span>
-                @endif
-            </p>
-        @endforeach
+    // Your authorization logic
+    $this->authorize('transition', $model);
 
-        <form method="POST" action="/invoices/{{ $invoice->id }}/workflow/transition">
-            @csrf
-            <input type="hidden" name="basket_id" value="{{ $step['basket']->id }}">
-            <button type="submit">{{ $step['label'] ?? $step['basket']->name }}</button>
-        </form>
-    </div>
-@endforeach
+    // ...
+}
 ```
 
 ---
 
 ## With Inertia / Vue / React
 
-Same principle — the controller returns data, the frontend renders it:
+The same controller works — just change the response format:
 
 ```php
-class InvoiceController extends Controller
+public function status(Request $request, string $type, string $id)
 {
-    public function show(Invoice $invoice)
-    {
-        $wf = Workflow::for($invoice);
+    $model = $this->resolve($type, $id);
+    $wf = $this->scoped($request, $model);
 
-        return Inertia::render('Invoices/Show', [
-            'invoice' => $invoice,
-            'workflow' => [
-                'status'       => $wf->currentStatus(),
-                'nextSteps'    => $wf->nextBaskets(),
-                'history'      => $wf->history(),
-                'isLocked'     => $wf->isLocked(),
-                'lockedBy'     => $wf->lockedBy(),
-                'requirements' => $wf->requirements(),
-            ],
-        ]);
-    }
+    return Inertia::render('Workflow/Status', [
+        'model'        => $model,
+        'type'         => $type,
+        'status'       => $wf->currentStatus(),
+        'nextSteps'    => $wf->nextBaskets(),
+        'history'      => $wf->history(),
+        'isLocked'     => $wf->isLocked(),
+        'requirements' => $wf->requirements(),
+    ]);
 }
 ```
-
----
-
-## Summary
-
-| Approach | When to use |
-|---|---|
-| Simple controller | One model with one workflow |
-| Multi-circuit controller | One model in multiple workflows |
-| No dedicated controller | Workflow integrated in your existing controllers |
-
-The package does not force any approach. Choose what fits your architecture.
