@@ -4,11 +4,14 @@ namespace Maestrodimateo\Workflow;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Events\TransitionEvent;
+use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Circuit;
+use Maestrodimateo\Workflow\Models\WorkflowLock;
 use Maestrodimateo\Workflow\Repositories\BasketRepository;
 
 class WorkflowManager
@@ -105,9 +108,12 @@ class WorkflowManager
 
     /**
      * @throws \Throwable
+     * @throws ModelLockedException If the model is locked by another user
      */
     public function transition(string $nextBasketId, ?string $comment = null): bool
     {
+        $this->guardAgainstLock();
+
         $currentBasket = $this->currentStatus();
         $nextBasket = Basket::query()->findOrFail($nextBasketId);
 
@@ -117,6 +123,9 @@ class WorkflowManager
             $this->executeTransitionActions($currentBasket, $nextBasket);
 
             event(new TransitionEvent($currentBasket, $nextBasket, $this->subject, $comment));
+
+            // Release the lock after a successful transition
+            $this->unlock();
 
             return true;
         });
@@ -139,6 +148,149 @@ class WorkflowManager
                 (new static::$actions[$key])->execute($this->subject, $from, $to, $config);
             }
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Resource locking
+    // -------------------------------------------------------------------------
+
+    /**
+     * Lock the model so no other user can transition it.
+     * The lock auto-expires after the configured duration.
+     *
+     * @param  int|null  $minutes  Lock duration (null = use config default)
+     * @return WorkflowLock The created lock
+     *
+     * @throws ModelLockedException If already locked by someone else
+     */
+    public function lock(?int $minutes = null): WorkflowLock
+    {
+        $this->cleanExpiredLock();
+
+        $existingLock = $this->getActiveLock();
+        $currentUserId = $this->currentUserId();
+
+        // Already locked by someone else
+        if ($existingLock && $existingLock->locked_by !== $currentUserId) {
+            throw new ModelLockedException($existingLock);
+        }
+
+        // Already locked by the same user — extend it
+        if ($existingLock && $existingLock->locked_by === $currentUserId) {
+            $existingLock->update([
+                'expires_at' => now()->addMinutes($minutes ?? config('workflow.lock.duration_minutes', 30)),
+            ]);
+
+            return $existingLock->refresh();
+        }
+
+        // Create new lock
+        return $this->subject->workflowLock()->create([
+            'locked_by' => $currentUserId,
+            'expires_at' => now()->addMinutes($minutes ?? config('workflow.lock.duration_minutes', 30)),
+        ]);
+    }
+
+    /**
+     * Release the lock on the model.
+     * Only the lock owner or a force unlock can release it.
+     */
+    public function unlock(bool $force = false): void
+    {
+        $lock = $this->getActiveLock();
+
+        if (! $lock) {
+            return;
+        }
+
+        if (! $force && $lock->locked_by !== $this->currentUserId()) {
+            return; // Can't unlock someone else's lock without force
+        }
+
+        $lock->delete();
+    }
+
+    /**
+     * Check if the model is currently locked.
+     */
+    public function isLocked(): bool
+    {
+        return $this->getActiveLock() !== null;
+    }
+
+    /**
+     * Check if the model is locked by the current user.
+     */
+    public function isLockedByMe(): bool
+    {
+        $lock = $this->getActiveLock();
+
+        return $lock && $lock->locked_by === $this->currentUserId();
+    }
+
+    /**
+     * Get the user ID that holds the lock, or null.
+     */
+    public function lockedBy(): ?string
+    {
+        return $this->getActiveLock()?->locked_by;
+    }
+
+    /**
+     * Get the lock expiration time, or null.
+     */
+    public function lockExpiration(): ?Carbon
+    {
+        return $this->getActiveLock()?->expires_at;
+    }
+
+    /**
+     * Get the active (non-expired) lock for the model.
+     */
+    private function getActiveLock(): ?WorkflowLock
+    {
+        // Always reload to avoid stale cache after lock/unlock
+        $this->subject->load('workflowLock');
+        $lock = $this->subject->workflowLock;
+
+        if (! $lock || ! $lock->isActive()) {
+            return null;
+        }
+
+        return $lock;
+    }
+
+    /**
+     * Delete expired locks for the model.
+     */
+    private function cleanExpiredLock(): void
+    {
+        $lock = $this->subject->workflowLock;
+
+        if ($lock && ! $lock->isActive()) {
+            $lock->delete();
+            $this->subject->unsetRelation('workflowLock');
+        }
+    }
+
+    /**
+     * Throw if the model is locked by another user.
+     */
+    private function guardAgainstLock(): void
+    {
+        $lock = $this->getActiveLock();
+
+        if ($lock && $lock->locked_by !== $this->currentUserId()) {
+            throw new ModelLockedException($lock);
+        }
+    }
+
+    /**
+     * Get the current authenticated user identifier.
+     */
+    private function currentUserId(): string
+    {
+        return (string) (auth()->user()?->{config('workflow.auth_identifier', 'id')} ?? 'system');
     }
 
     // -------------------------------------------------------------------------

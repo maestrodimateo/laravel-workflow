@@ -39,4 +39,15 @@ return [
     */
     'message_variables' => [],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Resource Locking
+    |--------------------------------------------------------------------------
+    | When an operator locks a model, no one else can transition it
+    | until the lock expires or is released.
+    */
+    'lock' => [
+        'duration_minutes' => (int) env('WORKFLOW_LOCK_DURATION', 30),
+    ],
+
 ];

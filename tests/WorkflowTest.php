@@ -1,8 +1,10 @@
 <?php
 
+use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
 use Maestrodimateo\Workflow\Facades\Workflow;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Circuit;
+use Maestrodimateo\Workflow\Models\WorkflowLock;
 use Maestrodimateo\Workflow\Tests\Fixtures\TestModel as Test;
 
 // ---------------------------------------------------------------------------
@@ -209,4 +211,91 @@ it('can list all circuits a model belongs to', function () {
     $circuits = Workflow::for($model)->circuits();
 
     expect($circuits)->toHaveCount(2);
+});
+
+// ---------------------------------------------------------------------------
+// Resource locking
+// ---------------------------------------------------------------------------
+
+it('can lock and unlock a model', function () {
+    Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $model = Test::create(['name' => 'Invoice #200']);
+
+    $wf = Workflow::for($model);
+    $lock = $wf->lock(15);
+
+    expect($lock)->toBeInstanceOf(WorkflowLock::class)
+        ->and($wf->isLocked())->toBeTrue()
+        ->and($wf->lockedBy())->toBe('system')
+        ->and($wf->lockExpiration())->not->toBeNull();
+
+    $wf->unlock();
+
+    expect($wf->isLocked())->toBeFalse();
+});
+
+it('allows the lock owner to transition', function () {
+    $circuit = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $draft = $circuit->baskets()->first();
+    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#2563eb']);
+    $draft->next()->attach($review);
+
+    $model = Test::create(['name' => 'Invoice #201']);
+
+    $wf = Workflow::for($model);
+    $wf->lock();
+    $wf->transition($review->id);
+
+    $model->load('baskets');
+
+    expect($model->currentStatus()->status)->toBe('REVIEW')
+        ->and($wf->isLocked())->toBeFalse(); // Lock released after transition
+});
+
+it('blocks transition when locked by another user', function () {
+    $circuit = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $draft = $circuit->baskets()->first();
+    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#2563eb']);
+    $draft->next()->attach($review);
+
+    $model = Test::create(['name' => 'Invoice #202']);
+
+    // Simulate a lock by another user
+    $model->workflowLock()->create([
+        'locked_by' => 'other-user-id',
+        'expires_at' => now()->addMinutes(30),
+    ]);
+
+    expect(fn () => Workflow::for($model)->transition($review->id))
+        ->toThrow(ModelLockedException::class);
+});
+
+it('auto-expires locks after the configured duration', function () {
+    Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $model = Test::create(['name' => 'Invoice #203']);
+
+    // Create an expired lock
+    $model->workflowLock()->create([
+        'locked_by' => 'other-user-id',
+        'expires_at' => now()->subMinute(),
+    ]);
+
+    // Should not be considered locked
+    expect(Workflow::for($model)->isLocked())->toBeFalse();
+});
+
+it('filters unlocked models via scope', function () {
+    Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $free = Test::create(['name' => 'Free']);
+    $locked = Test::create(['name' => 'Locked']);
+
+    $locked->workflowLock()->create([
+        'locked_by' => 'user-1',
+        'expires_at' => now()->addMinutes(30),
+    ]);
+
+    $unlocked = Test::unlocked()->pluck('name')->all();
+
+    expect($unlocked)->toContain('Free')
+        ->and($unlocked)->not->toContain('Locked');
 });

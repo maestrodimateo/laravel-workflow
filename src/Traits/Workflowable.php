@@ -5,10 +5,12 @@ namespace Maestrodimateo\Workflow\Traits;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Circuit;
 use Maestrodimateo\Workflow\Models\History;
+use Maestrodimateo\Workflow\Models\WorkflowLock;
 
 /**
  * @mixin Model
@@ -72,5 +74,26 @@ trait Workflowable
     public function scopeFromBasket(Builder $query, Basket $basket): Builder
     {
         return $query->whereRelation('baskets', 'baskets.id', $basket->id);
+    }
+
+    /** Scope: only unlocked models (no active lock or lock expired) */
+    public function scopeUnlocked(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereDoesntHave('workflowLock')
+                ->orWhereHas('workflowLock', fn (Builder $sub) => $sub->where('expires_at', '<=', now()));
+        });
+    }
+
+    /** Scope: only models locked by a specific user */
+    public function scopeLockedBy(Builder $query, string $userId): Builder
+    {
+        return $query->whereHas('workflowLock', fn (Builder $q) => $q->where('locked_by', $userId)->where('expires_at', '>', now()));
+    }
+
+    /** The active workflow lock for this model */
+    public function workflowLock(): MorphOne
+    {
+        return $this->morphOne(WorkflowLock::class, 'lockable');
     }
 }
