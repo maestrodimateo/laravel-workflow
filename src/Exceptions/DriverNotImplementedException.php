@@ -8,6 +8,6 @@ class DriverNotImplementedException extends RuntimeException
 {
     public static function for(string $type): self
     {
-        return new self("Le driver de message [$type] n'est pas encore implémenté.");
+        return new self("The message driver [$type] is not implemented yet.");
     }
 }

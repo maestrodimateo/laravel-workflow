@@ -122,7 +122,7 @@ class WorkflowAdminController extends Controller
         $data = json_decode($request->file('file')->get(), true);
 
         if (! is_array($data) || ($data['_format'] ?? null) !== 'laravel-workflow/v1') {
-            return response()->json(['message' => 'Format de fichier invalide.'], 422);
+            return response()->json(['message' => 'Invalid file format.'], 422);
         }
 
         $circuit = DB::transaction(function () use ($data) {

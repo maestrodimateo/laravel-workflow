@@ -17,7 +17,7 @@ class WebhookAction implements TransitionAction
 
     public static function label(): string
     {
-        return 'Appeler un webhook';
+        return 'Call webhook';
     }
 
     /**

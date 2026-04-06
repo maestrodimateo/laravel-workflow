@@ -16,7 +16,7 @@ class MissingDocumentsException extends RuntimeException
     {
         $labels = array_column($documents, 'label');
 
-        $e = new self('Documents manquants : '.implode(', ', $labels));
+        $e = new self('Missing documents: '.implode(', ', $labels));
         $e->documents = $documents;
 
         return $e;

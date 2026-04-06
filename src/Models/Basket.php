@@ -10,13 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Maestrodimateo\Workflow\Enums\AllowedBasketColors;
 
 /**
  * @property-read string $id
  * @property string $name
  * @property string $status
- * @property AllowedBasketColors $color
+ * @property string $color
  * @property array $roles
  * @property string $circuit_id
  * @property-read Circuit $circuit
@@ -37,7 +36,7 @@ class Basket extends Model
     ];
 
     public const array DEFAULT_STATUS = [
-        'name' => 'Brouillon',
+        'name' => 'Draft',
         'status' => 'DRAFT',
         'color' => '#64748b',
     ];

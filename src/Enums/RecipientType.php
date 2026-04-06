@@ -9,12 +9,12 @@ enum RecipientType: string
     use CasesManipulation;
 
     /**
-     * L'acteur de la demande
+     * The subject of the request
      */
     case SUBJECT = 'subject';
 
     /**
-     * Les opérateurs en charge de la demande directement
+     * The operators handling the request
      */
     case OPERATORS = 'operators';
 }

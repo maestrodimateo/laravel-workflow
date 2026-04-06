@@ -16,7 +16,7 @@ class RequireDocumentAction implements TransitionAction
 
     public static function label(): string
     {
-        return 'Exiger des documents';
+        return 'Require documents';
     }
 
     public function execute(Model $model, Basket $from, Basket $to, array $config = []): void

@@ -16,7 +16,7 @@ class LogTransitionAction implements TransitionAction
 
     public static function label(): string
     {
-        return 'Enregistrer dans les logs';
+        return 'Log transition';
     }
 
     public function execute(Model $model, Basket $from, Basket $to, array $config = []): void

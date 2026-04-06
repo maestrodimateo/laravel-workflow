@@ -12,7 +12,7 @@ class ModelLockedException extends RuntimeException
         public readonly WorkflowLock $lock,
     ) {
         parent::__construct(
-            "Ce dossier est verrouillé par [{$lock->locked_by}] jusqu'à [{$lock->expires_at->format('H:i')}]."
+            "This model is locked by [{$lock->locked_by}] until [{$lock->expires_at->format('H:i')}]."
         );
     }
 

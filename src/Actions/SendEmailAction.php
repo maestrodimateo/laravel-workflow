@@ -18,7 +18,7 @@ class SendEmailAction implements TransitionAction
 
     public static function label(): string
     {
-        return 'Envoyer un email';
+        return 'Send email';
     }
 
     public function execute(Model $model, Basket $from, Basket $to, array $config = []): void

@@ -20,7 +20,7 @@ it('creates a DRAFT basket automatically when a circuit is created', function ()
 
     expect($circuit->baskets()->count())->toBe(1)
         ->and($circuit->baskets()->first()->status)->toBe('DRAFT')
-        ->and($circuit->baskets()->first()->name)->toBe('Brouillon');
+        ->and($circuit->baskets()->first()->name)->toBe('Draft');
 });
 
 it('can add baskets to a circuit and link transitions', function () {
