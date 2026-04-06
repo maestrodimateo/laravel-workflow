@@ -349,7 +349,7 @@
             /**
              * Get the position of a basket node, accounting for live drag position.
              * param: {string} basketId
-             * returns: {{ x: number, y: number }}
+             * returns: { x: number, y: number }
              */
             getNodePosition(basketId) {
                 if (this.draggedNodeId === basketId) {
@@ -950,7 +950,7 @@
              * param: {number} x2 - End X
              * param: {number} y2 - End Y
              * param: {number} t - Parameter (0 = start, 1 = end)
-             * returns: {{ x: number, y: number }}
+             * returns: { x: number, y: number }
              */
             bezierPoint(x1, y1, cx1, cy1, cx2, cy2, x2, y2, t) {
                 const u = 1 - t;
@@ -1051,8 +1051,8 @@
             /**
              * Draw a single edge between two positions.
              * param: {CanvasRenderingContext2D} ctx
-             * param: {{ x: number, y: number }} fromPos
-             * param: {{ x: number, y: number }} toPos
+             * param: { x: number, y: number } fromPos
+             * param: { x: number, y: number } toPos
              * param: {boolean} isSelected
              * param: {string|null} label
              * param: {Object} colors - Color palette
