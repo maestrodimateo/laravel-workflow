@@ -39,10 +39,10 @@ class Basket extends Model
     public const array DEFAULT_STATUS = [
         'name' => 'Brouillon',
         'status' => 'DRAFT',
+        'color' => '#64748b',
     ];
 
     protected $casts = [
-        'color' => AllowedBasketColors::class,
         'roles' => 'array',
     ];
 

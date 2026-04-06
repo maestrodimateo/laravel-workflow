@@ -2,7 +2,6 @@
     "name": "maestrodimateo/laravel-workflow",
     "description": "Workflow engine for Laravel applications",
     "type": "library",
-    "version": "1.0.0",
     "license": "MIT",
     "require": {
         "php": "^8.3 || ^8.4",

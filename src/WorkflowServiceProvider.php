@@ -5,6 +5,7 @@ namespace Maestrodimateo\Workflow;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Maestrodimateo\Workflow\Actions\LogTransitionAction;
+use Maestrodimateo\Workflow\Actions\RequireDocumentAction;
 use Maestrodimateo\Workflow\Actions\SendEmailAction;
 use Maestrodimateo\Workflow\Actions\WebhookAction;
 use Maestrodimateo\Workflow\Console\MakeTransitionActionCommand;
@@ -49,6 +50,7 @@ class WorkflowServiceProvider extends ServiceProvider
         WorkflowManager::registerAction(SendEmailAction::class);
         WorkflowManager::registerAction(LogTransitionAction::class);
         WorkflowManager::registerAction(WebhookAction::class);
+        WorkflowManager::registerAction(RequireDocumentAction::class);
     }
 
     private function loadRoutes(): void

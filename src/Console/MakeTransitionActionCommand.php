@@ -20,7 +20,7 @@ class MakeTransitionActionCommand extends GeneratorCommand
 
     protected function getDefaultNamespace($rootNamespace): string
     {
-        return $rootNamespace.'\\Actions';
+        return $rootNamespace.'\\Workflow\\Actions';
     }
 
     protected function buildClass($name): string

@@ -4,7 +4,6 @@ namespace Maestrodimateo\Workflow\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Maestrodimateo\Workflow\Enums\AllowedBasketColors;
 
 /**
  * Class BasketRequest
@@ -29,7 +28,7 @@ class BasketRequest extends FormRequest
                 ->ignore($this->basket)],
             /** Le statut du panier */
             'status' => ['required', 'string'],
-            'color' => ['required', Rule::in(AllowedBasketColors::values())],
+            'color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             /** L'identifiant du circuit */
             'circuit_id' => ['required', 'exists:circuits,id'],
             /** Les noms de rôles autorisés pour ce panier */
@@ -51,7 +50,7 @@ class BasketRequest extends FormRequest
     {
         return [
             'color.required' => 'La couleur du panier est obligatoire',
-            'color.in' => 'La couleur du panier est invalide',
+            'color.regex' => 'La couleur doit être un code hexadécimal valide (ex: #2563eb)',
             'name.required' => 'Le nom du panier est obligatoire',
             'name.unique' => 'Le nom du panier est déjà utilisé',
             'status.required' => 'Le statut du panier est obligatoire',

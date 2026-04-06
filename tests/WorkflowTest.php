@@ -25,8 +25,8 @@ it('can add baskets to a circuit and link transitions', function () {
     $circuit = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
     $draft = $circuit->baskets()->first();
 
-    $review = $circuit->baskets()->create(['name' => 'En révision', 'status' => 'REVIEW', 'color' => '#30638E']);
-    $done = $circuit->baskets()->create(['name' => 'Validé',      'status' => 'DONE',   'color' => '#43A047']);
+    $review = $circuit->baskets()->create(['name' => 'En révision', 'status' => 'REVIEW', 'color' => '#2563eb']);
+    $done = $circuit->baskets()->create(['name' => 'Validé',      'status' => 'DONE',   'color' => '#059669']);
 
     $draft->next()->attach($review);
     $review->next()->attach($done);
@@ -76,7 +76,7 @@ it('returns the current status via the helper', function () {
 it('lists available next baskets', function () {
     $circuit = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
     $draft = $circuit->baskets()->first();
-    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#30638E']);
+    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#2563eb']);
     $draft->next()->attach($review);
 
     $model = Test::create(['name' => 'Invoice #004']);
@@ -90,7 +90,7 @@ it('lists available next baskets', function () {
 it('transitions a model to the next basket', function () {
     $circuit = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
     $draft = $circuit->baskets()->first();
-    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#30638E']);
+    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#2563eb']);
     $draft->next()->attach($review);
 
     $model = Test::create(['name' => 'Invoice #005']);
@@ -105,7 +105,7 @@ it('transitions a model to the next basket', function () {
 it('records a history entry after a transition', function () {
     $circuit = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
     $draft = $circuit->baskets()->first();
-    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#30638E']);
+    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#2563eb']);
     $draft->next()->attach($review);
 
     $model = Test::create(['name' => 'Invoice #006']);
@@ -122,8 +122,8 @@ it('records a history entry after a transition', function () {
 it('can perform multiple transitions', function () {
     $circuit = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
     $draft = $circuit->baskets()->first();
-    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#30638E']);
-    $done = $circuit->baskets()->create(['name' => 'Done',   'status' => 'DONE',   'color' => '#43A047']);
+    $review = $circuit->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#2563eb']);
+    $done = $circuit->baskets()->create(['name' => 'Done',   'status' => 'DONE',   'color' => '#059669']);
     $draft->next()->attach($review);
     $review->next()->attach($done);
 
@@ -136,4 +136,77 @@ it('can perform multiple transitions', function () {
 
     expect($model->currentStatus()->status)->toBe('DONE')
         ->and(Workflow::for($model)->history())->toHaveCount(2);
+});
+
+// ---------------------------------------------------------------------------
+// Multi-circuit support
+// ---------------------------------------------------------------------------
+
+it('attaches a model to DRAFT baskets of ALL circuits targeting it', function () {
+    $circuitA = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $circuitB = Circuit::create(['name' => 'Compliance', 'targetModel' => Test::class]);
+
+    $model = Test::create(['name' => 'Invoice #100']);
+
+    expect($model->baskets()->count())->toBe(2);
+});
+
+it('can get the current status scoped to a specific circuit via in()', function () {
+    $circuitA = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $circuitB = Circuit::create(['name' => 'Compliance', 'targetModel' => Test::class]);
+
+    $model = Test::create(['name' => 'Invoice #101']);
+
+    $statusA = Workflow::for($model)->in($circuitA)->currentStatus();
+    $statusB = Workflow::for($model)->in($circuitB->id)->currentStatus();
+
+    expect($statusA)->toBeInstanceOf(Basket::class)
+        ->and($statusA->circuit_id)->toBe($circuitA->id)
+        ->and($statusB->circuit_id)->toBe($circuitB->id);
+});
+
+it('can transition in a specific circuit without affecting the other', function () {
+    $circuitA = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $circuitB = Circuit::create(['name' => 'Compliance', 'targetModel' => Test::class]);
+
+    $reviewA = $circuitA->baskets()->create(['name' => 'Review', 'status' => 'REVIEW', 'color' => '#2563eb']);
+    $circuitA->baskets()->first()->next()->attach($reviewA);
+
+    $model = Test::create(['name' => 'Invoice #102']);
+
+    // Transition in circuit A only
+    Workflow::for($model)->in($circuitA)->transition($reviewA->id);
+    $model->load('baskets');
+
+    // Circuit A should be in REVIEW
+    $statusA = Workflow::for($model)->in($circuitA)->currentStatus();
+    expect($statusA->status)->toBe('REVIEW');
+
+    // Circuit B should still be in DRAFT
+    $statusB = Workflow::for($model)->in($circuitB)->currentStatus();
+    expect($statusB->status)->toBe('DRAFT');
+});
+
+it('can list all statuses across circuits via allStatuses()', function () {
+    $circuitA = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $circuitB = Circuit::create(['name' => 'Compliance', 'targetModel' => Test::class]);
+
+    $model = Test::create(['name' => 'Invoice #103']);
+
+    $statuses = Workflow::for($model)->allStatuses();
+
+    expect($statuses)->toHaveCount(2)
+        ->and($statuses[$circuitA->id]['circuit']->id)->toBe($circuitA->id)
+        ->and($statuses[$circuitB->id]['circuit']->id)->toBe($circuitB->id);
+});
+
+it('can list all circuits a model belongs to', function () {
+    $circuitA = Circuit::create(['name' => 'Approval', 'targetModel' => Test::class]);
+    $circuitB = Circuit::create(['name' => 'Compliance', 'targetModel' => Test::class]);
+
+    $model = Test::create(['name' => 'Invoice #104']);
+
+    $circuits = Workflow::for($model)->circuits();
+
+    expect($circuits)->toHaveCount(2);
 });

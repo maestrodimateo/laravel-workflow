@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unique(['status', 'circuit_id']);
             $table->string('name');
             $table->string('status');
-            $table->string('color')->default('#30638E');
+            $table->string('color')->default('#2563eb');
             $table->json('roles')->nullable();
             $table->foreignUuid('circuit_id')->constrained()->cascadeOnDelete();
             $table->timestamps();

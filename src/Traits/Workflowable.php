@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Maestrodimateo\Workflow\Models\Basket;
+use Maestrodimateo\Workflow\Models\Circuit;
 use Maestrodimateo\Workflow\Models\History;
 
 /**
@@ -19,35 +20,57 @@ use Maestrodimateo\Workflow\Models\History;
  */
 trait Workflowable
 {
+    /**
+     * On creation, attach the model to the DRAFT basket of ALL circuits targeting this model class.
+     */
     public static function bootWorkflowable(): void
     {
         static::created(static function ($model): void {
-            $basket = Basket::query()
+            $draftBaskets = Basket::query()
                 ->whereRelation('circuit', 'targetModel', self::class)
                 ->whereDoesntHave('previous')
-                ->first();
+                ->get();
 
-            $basket?->targetModels()->attach($model);
+            foreach ($draftBaskets as $basket) {
+                $model->baskets()->attach($basket->id);
+            }
         });
     }
 
+    /** All baskets this model is/has been in (across all circuits) */
     public function baskets(): MorphToMany
     {
         return $this->morphToMany(Basket::class, 'statusable', 'statusable', 'statusable_id', 'basket_id');
     }
 
+    /** All history entries across all circuits */
     public function histories(): MorphMany
     {
         return $this->morphMany(History::class, 'historable');
     }
 
-    public function currentStatus(): ?Basket
+    /**
+     * Get the current basket (last attached), optionally filtered by circuit.
+     *
+     * @param  string|Circuit|null  $circuit  Circuit ID, Circuit instance, or null for the latest across all
+     */
+    public function currentStatus(string|Circuit|null $circuit = null): ?Basket
     {
+        if ($circuit) {
+            $circuitId = $circuit instanceof Circuit ? $circuit->id : $circuit;
+
+            return $this->baskets()
+                ->where('circuit_id', $circuitId)
+                ->orderByPivot('created_at', 'desc')
+                ->first();
+        }
+
         return $this->baskets->last();
     }
 
+    /** Scope: models in a specific basket */
     public function scopeFromBasket(Builder $query, Basket $basket): Builder
     {
-        return $query->whereRelation('baskets', 'status', $basket->status);
+        return $query->whereRelation('baskets', 'baskets.id', $basket->id);
     }
 }
