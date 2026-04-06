@@ -441,19 +441,80 @@ return [
 
 ## Workflowable Trait
 
-The trait adds these methods directly on your model:
+The `Workflowable` trait adds relations, methods, and scopes directly on your model instance. Everything below is available without using the Facade.
+
+### Relations
 
 ```php
-$invoice->baskets;                       // All baskets across all circuits
-$invoice->histories;                     // All history entries
-$invoice->currentStatus();               // Last basket (any circuit)
-$invoice->currentStatus($circuit);       // Current basket in a specific circuit
-$invoice->workflowLock;                  // Active lock (or null)
+$invoice->baskets;        // Collection<Basket> — all baskets the model is/has been in
+$invoice->histories;      // Collection<History> — all transition history entries
+$invoice->workflowLock;   // WorkflowLock|null — the active lock on this model
+```
 
-// Scopes
-Invoice::fromBasket($basket)->get();     // Models in a specific basket
-Invoice::unlocked()->get();              // Models not locked (or lock expired)
-Invoice::lockedBy($userId)->get();       // Models locked by a specific user
+### Methods
+
+```php
+// Current status (last basket attached)
+$invoice->currentStatus();                // ?Basket — across all circuits
+$invoice->currentStatus($circuit);        // ?Basket — in a specific circuit
+$invoice->currentStatus('circuit-uuid');   // same with a string ID
+
+// Inspect the current basket
+$invoice->currentStatus()->status;        // "REVIEW"
+$invoice->currentStatus()->name;          // "Under Review"
+$invoice->currentStatus()->color;         // "#2563eb"
+$invoice->currentStatus()->roles;         // ["manager", "validator"]
+$invoice->currentStatus()->hasRole('manager'); // true
+
+// Access the circuit
+$invoice->currentStatus()->circuit->name; // "Invoice Approval"
+
+// Navigate the workflow graph
+$invoice->currentStatus()->next;          // Collection<Basket> — possible next steps
+$invoice->currentStatus()->previous;      // Collection<Basket> — where it came from
+
+// History with duration tracking
+$invoice->histories->each(function ($h) {
+    $h->previous_status;   // "DRAFT"
+    $h->next_status;       // "REVIEW"
+    $h->comment;           // "Sent for review"
+    $h->done_by;           // "user-uuid"
+    $h->duration_seconds;  // 3600
+    $h->duration_human;    // "1h"
+    $h->created_at;        // Carbon
+});
+
+// Lock info
+$invoice->workflowLock?->locked_by;      // "user-uuid" or null
+$invoice->workflowLock?->expires_at;     // Carbon or null
+$invoice->workflowLock?->isActive();     // true if not expired
+```
+
+### Scopes
+
+```php
+// Models currently in a specific basket
+Invoice::fromBasket($reviewBasket)->get();
+
+// Available models (not locked or lock expired)
+Invoice::unlocked()->get();
+
+// Models locked by a specific user
+Invoice::lockedBy(auth()->id())->get();
+
+// Combine scopes
+Invoice::fromBasket($reviewBasket)->unlocked()->get();
+```
+
+### Automatic Behavior
+
+When a model is created, it's automatically attached to the DRAFT basket of every circuit targeting its class:
+
+```php
+$invoice = Invoice::create(['number' => 'INV-001']);
+
+$invoice->currentStatus()->status; // "DRAFT" — automatic
+$invoice->baskets->count();        // 1 (or more if multiple circuits)
 ```
 
 ---
