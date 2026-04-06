@@ -1,10 +1,10 @@
-# Intégrer le workflow dans vos contrôleurs
+# Integrating Workflow into Your Controllers
 
-Ce guide montre comment connecter le package à vos contrôleurs Laravel. Le package ne fournit pas de contrôleur applicatif — c'est votre responsabilité, car chaque projet a ses propres besoins en permissions, validation et réponses.
+This guide shows how to connect the package to your Laravel controllers. The package does not provide an application-level controller — that's your responsibility, because every project has its own permissions, validation, and response needs.
 
 ---
 
-## Contrôleur simple (un seul modèle)
+## Simple Controller (single model)
 
 ```php
 use Maestrodimateo\Workflow\Facades\Workflow;
@@ -13,7 +13,7 @@ use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
 class InvoiceWorkflowController extends Controller
 {
     /**
-     * Afficher le statut workflow d'une facture.
+     * Show the workflow status of an invoice.
      */
     public function status(Invoice $invoice)
     {
@@ -28,7 +28,7 @@ class InvoiceWorkflowController extends Controller
     }
 
     /**
-     * Transitionner la facture vers un nouveau panier.
+     * Transition the invoice to a new basket.
      */
     public function transition(Request $request, Invoice $invoice)
     {
@@ -43,36 +43,36 @@ class InvoiceWorkflowController extends Controller
                 $request->comment,
             );
 
-            return back()->with('success', 'Statut mis à jour');
+            return back()->with('success', 'Status updated');
         } catch (ModelLockedException $e) {
             return back()->withErrors(['lock' => $e->getMessage()]);
         }
     }
 
     /**
-     * Verrouiller la facture pour traitement exclusif.
+     * Lock the invoice for exclusive processing.
      */
     public function lock(Invoice $invoice)
     {
         try {
             Workflow::for($invoice)->lock();
-            return response()->json(['message' => 'Dossier verrouillé']);
+            return response()->json(['message' => 'Model locked']);
         } catch (ModelLockedException $e) {
             return response()->json(['error' => $e->getMessage()], 423);
         }
     }
 
     /**
-     * Libérer le verrou.
+     * Release the lock.
      */
     public function unlock(Invoice $invoice)
     {
         Workflow::for($invoice)->unlock();
-        return response()->json(['message' => 'Dossier libéré']);
+        return response()->json(['message' => 'Model unlocked']);
     }
 
     /**
-     * Historique des transitions.
+     * Transition history.
      */
     public function history(Invoice $invoice)
     {
@@ -84,7 +84,7 @@ class InvoiceWorkflowController extends Controller
 }
 ```
 
-Routes :
+Routes:
 
 ```php
 Route::prefix('invoices/{invoice}/workflow')->group(function () {
@@ -98,9 +98,9 @@ Route::prefix('invoices/{invoice}/workflow')->group(function () {
 
 ---
 
-## Contrôleur multi-circuit
+## Multi-Circuit Controller
 
-Si votre modèle appartient à plusieurs circuits, passez l'ID du circuit :
+If your model belongs to multiple circuits, pass the circuit ID:
 
 ```php
 class InvoiceWorkflowController extends Controller
@@ -119,7 +119,7 @@ class InvoiceWorkflowController extends Controller
             ]);
         }
 
-        // Vue d'ensemble de tous les circuits
+        // Overview across all circuits
         return response()->json([
             'statuses' => Workflow::for($invoice)->allStatuses(),
             'circuits' => Workflow::for($invoice)->circuits(),
@@ -138,23 +138,23 @@ class InvoiceWorkflowController extends Controller
             ->in($request->circuit_id)
             ->transition($request->basket_id, $request->comment);
 
-        return back()->with('success', 'Statut mis à jour');
+        return back()->with('success', 'Status updated');
     }
 }
 ```
 
 ---
 
-## Contrôleur générique (plusieurs modèles)
+## Generic Controller (multiple models)
 
-Si vous voulez un seul contrôleur pour tous vos modèles workflow :
+If you want a single controller for all your workflow models:
 
 ```php
 class WorkflowController extends Controller
 {
     /**
-     * Mapping des types vers les modèles.
-     * Vous pouvez aussi mettre ça dans config/workflow.php.
+     * Model type mapping.
+     * You can also put this in config/workflow.php.
      */
     private array $models = [
         'invoice'       => \App\Models\Invoice::class,
@@ -190,7 +190,7 @@ class WorkflowController extends Controller
                 $request->comment,
             );
 
-            return response()->json(['message' => 'Transitionné']);
+            return response()->json(['message' => 'Transitioned']);
         } catch (ModelLockedException $e) {
             return response()->json(['error' => $e->getMessage()], 423);
         }
@@ -202,7 +202,7 @@ class WorkflowController extends Controller
 
         try {
             Workflow::for($model)->lock();
-            return response()->json(['message' => 'Verrouillé']);
+            return response()->json(['message' => 'Locked']);
         } catch (ModelLockedException $e) {
             return response()->json(['error' => $e->getMessage()], 423);
         }
@@ -213,7 +213,7 @@ class WorkflowController extends Controller
         $model = $this->resolve($type, $id);
         Workflow::for($model)->unlock();
 
-        return response()->json(['message' => 'Déverrouillé']);
+        return response()->json(['message' => 'Unlocked']);
     }
 
     public function history(string $type, string $id)
@@ -224,19 +224,19 @@ class WorkflowController extends Controller
     }
 
     /**
-     * Résoudre le modèle depuis le type et l'ID.
+     * Resolve a model from its type and ID.
      */
     private function resolve(string $type, string $id): Model
     {
         $class = $this->models[$type] ?? null;
-        abort_unless($class, 404, "Type [{$type}] inconnu");
+        abort_unless($class, 404, "Unknown type [{$type}]");
 
         return $class::findOrFail($id);
     }
 }
 ```
 
-Routes :
+Routes:
 
 ```php
 Route::prefix('workflow/{type}/{id}')->group(function () {
@@ -248,7 +248,7 @@ Route::prefix('workflow/{type}/{id}')->group(function () {
 });
 ```
 
-Usage :
+Usage:
 
 ```
 GET    /workflow/invoice/uuid-123/status
@@ -258,9 +258,9 @@ POST   /workflow/purchase/uuid-789/lock
 
 ---
 
-## Afficher les prérequis avant une transition
+## Displaying Requirements Before a Transition
 
-Si des actions `require_document` sont configurées sur une transition, affichez-les à l'utilisateur :
+If `require_document` actions are configured on a transition, show them to the user:
 
 ```php
 class InvoiceWorkflowController extends Controller
@@ -271,9 +271,9 @@ class InvoiceWorkflowController extends Controller
         $nextBaskets = $wf->nextBaskets();
 
         $steps = $nextBaskets->map(fn ($basket) => [
-            'basket'       => $basket,
-            'label'        => $basket->pivot->label,
-            'documents'    => $wf->requiredDocuments($basket->id),
+            'basket'    => $basket,
+            'label'     => $basket->pivot->label,
+            'documents' => $wf->requiredDocuments($basket->id),
         ]);
 
         return response()->json($steps);
@@ -281,7 +281,7 @@ class InvoiceWorkflowController extends Controller
 }
 ```
 
-Côté frontend (Blade) :
+In a Blade view:
 
 ```blade
 @foreach ($steps as $step)
@@ -294,7 +294,7 @@ Côté frontend (Blade) :
                 @if ($invoice->documents()->where('type', $doc['type'])->exists())
                     <span class="text-green-600">✓</span>
                 @else
-                    <span class="text-red-600">manquant</span>
+                    <span class="text-red-600">missing</span>
                 @endif
             </p>
         @endforeach
@@ -310,9 +310,9 @@ Côté frontend (Blade) :
 
 ---
 
-## Avec Inertia / Vue / React
+## With Inertia / Vue / React
 
-Le principe est le même — le contrôleur retourne les données, le frontend les affiche :
+Same principle — the controller returns data, the frontend renders it:
 
 ```php
 class InvoiceController extends Controller
@@ -338,13 +338,13 @@ class InvoiceController extends Controller
 
 ---
 
-## Résumé
+## Summary
 
-| Approche | Quand l'utiliser |
+| Approach | When to use |
 |---|---|
-| Contrôleur simple | Un seul modèle avec un workflow |
-| Contrôleur multi-circuit | Un modèle dans plusieurs workflows |
-| Contrôleur générique | Plusieurs modèles, mêmes besoins |
-| Pas de contrôleur dédié | Workflow intégré dans vos contrôleurs existants |
+| Simple controller | One model with one workflow |
+| Multi-circuit controller | One model in multiple workflows |
+| Generic controller | Multiple models, same needs |
+| No dedicated controller | Workflow integrated in your existing controllers |
 
-Le package ne force aucune approche. Choisissez celle qui correspond à votre architecture.
+The package does not force any approach. Choose what fits your architecture.

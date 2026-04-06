@@ -1,8 +1,8 @@
-# Utilisation de la Facade Workflow
+# Using the Workflow Facade
 
-## Prérequis
+## Prerequisites
 
-Ajoutez le trait `Workflowable` sur votre modèle Eloquent :
+Add the `Workflowable` trait to your Eloquent model:
 
 ```php
 use Maestrodimateo\Workflow\Traits\Workflowable;
@@ -13,13 +13,13 @@ class Invoice extends Model
 }
 ```
 
-Dès qu'une instance de `Invoice` est créée, elle est automatiquement placée dans le panier DRAFT de **tous les circuits** qui ciblent ce modèle.
+When an `Invoice` is created, it's automatically placed in the DRAFT basket of **every circuit** targeting this model.
 
 ---
 
 ## Facade vs Helper
 
-Deux syntaxes sont disponibles, strictement équivalentes :
+Two syntaxes are available, strictly equivalent:
 
 ```php
 use Maestrodimateo\Workflow\Facades\Workflow;
@@ -30,17 +30,17 @@ Workflow::for($invoice)->currentStatus();
 // Helper
 workflow($invoice)->currentStatus();
 
-// Helper sans argument (chaînage)
+// Helper without argument (chaining)
 workflow()->for($invoice)->currentStatus();
 ```
 
 ---
 
-## Méthodes disponibles
+## Available Methods
 
 ### `for(Model $model): WorkflowManager`
 
-Lie le manager à un modèle. Retourne une **nouvelle instance** pour permettre l'usage concurrent.
+Bind the manager to a model. Returns a **new instance** to allow concurrent use.
 
 ```php
 $wf = Workflow::for($invoice);
@@ -50,7 +50,7 @@ $wf = Workflow::for($invoice);
 
 ### `in(string|Circuit $circuit): WorkflowManager`
 
-Scope toutes les opérations à un circuit spécifique. Nécessaire quand le modèle appartient à plusieurs circuits.
+Scope all operations to a specific circuit. Required when the model belongs to multiple circuits.
 
 ```php
 Workflow::for($invoice)->in($approvalCircuit)->currentStatus();
@@ -61,27 +61,26 @@ Workflow::for($invoice)->in('circuit-uuid')->transition($basketId);
 
 ### `currentStatus(): ?Basket`
 
-Retourne le panier (étape) actuel du modèle, ou `null` s'il n'est dans aucun panier.
+Returns the current basket (step) of the model, or `null` if not in any basket.
 
 ```php
 $basket = Workflow::for($invoice)->currentStatus();
 
-echo $basket->name;    // "En révision"
-echo $basket->status;  // "REVIEW"
-echo $basket->color;   // AllowedBasketColors::BLUE
+echo $basket->name;   // "Under Review"
+echo $basket->status; // "REVIEW"
 ```
 
 ---
 
 ### `nextBaskets(): Collection`
 
-Retourne la collection des paniers vers lesquels le modèle peut transitionner depuis son statut actuel.
+Returns the baskets the model can transition to from its current status.
 
 ```php
 $options = Workflow::for($invoice)->nextBaskets();
 
 foreach ($options as $basket) {
-    echo $basket->name; // "Validé", "Rejeté"...
+    echo $basket->name; // "Approved", "Rejected"...
 }
 ```
 
@@ -89,37 +88,39 @@ foreach ($options as $basket) {
 
 ### `transition(string $nextBasketId, ?string $comment = null): bool`
 
-Fait passer le modèle d'un panier au suivant. Exécuté dans une transaction.
+Move the model from one basket to the next. Runs inside a DB transaction.
 
-| Paramètre | Type | Description |
+| Parameter | Type | Description |
 |---|---|---|
-| `$nextBasketId` | `string` | UUID du panier cible |
-| `$comment` | `?string` | Commentaire optionnel (stocké dans l'historique) |
+| `$nextBasketId` | `string` | UUID of the target basket |
+| `$comment` | `?string` | Optional comment (stored in history) |
 
 ```php
-// Transition simple
+// Simple transition
 Workflow::for($invoice)->transition($nextBasket->id);
 
-// Avec commentaire
+// With comment
 Workflow::for($invoice)->transition(
     $nextBasket->id,
-    'Validé par le directeur financier'
+    'Approved by the financial director'
 );
 ```
 
-**Ce qui se passe lors d'une transition :**
+**What happens during a transition:**
 
-1. Le modèle est détaché de l'ancien panier et attaché au nouveau
-2. Les **actions configurées visuellement** sur la transition sont exécutées
-3. Le `TransitionEvent` est émis → `HistoryListener` enregistre l'historique avec la durée
-4. Vos listeners custom s'exécutent
+1. Lock guard — throws `ModelLockedException` if locked by another user
+2. Model detached from current basket, attached to next
+3. Transition actions executed (configured visually)
+4. `TransitionEvent` fired → `HistoryListener` records history with duration
+5. Lock released automatically
+6. Your custom listeners run
 
 ---
 
 ### `history(): Collection`
 
-Retourne l'historique complet des transitions du modèle, trié du plus récent au plus ancien.
-Chaque entrée contient la **durée** passée dans l'étape précédente.
+Returns the full transition history, sorted newest first.
+Each entry includes the **duration** spent in the previous step.
 
 ```php
 $history = Workflow::for($invoice)->history();
@@ -127,21 +128,21 @@ $history = Workflow::for($invoice)->history();
 foreach ($history as $entry) {
     echo $entry->previous_status;  // "DRAFT"
     echo $entry->next_status;      // "REVIEW"
-    echo $entry->comment;          // "Envoyé pour validation"
-    echo $entry->done_by;          // ID de l'utilisateur
-    echo $entry->duration_seconds; // 3600 (1 heure en secondes)
+    echo $entry->comment;          // "Sent for review"
+    echo $entry->done_by;          // User ID
+    echo $entry->duration_seconds; // 3600
     echo $entry->duration_human;   // "1h"
-    echo $entry->created_at;       // Date de la transition
+    echo $entry->created_at;       // Transition date
 }
 ```
 
-Formats lisibles : `45s`, `12min`, `2h 35min`, `3j 4h`.
+Human-readable formats: `45s`, `12min`, `2h 35min`, `3d 4h`.
 
 ---
 
 ### `totalDuration(): int`
 
-Retourne le temps total de traitement (somme de toutes les transitions, en secondes).
+Total processing time across all transitions (in seconds).
 
 ```php
 $seconds = Workflow::for($invoice)->totalDuration();
@@ -151,7 +152,7 @@ $seconds = Workflow::for($invoice)->totalDuration();
 
 ### `durationInStatus(string $status): int`
 
-Retourne le temps passé dans un statut spécifique (en secondes).
+Time spent in a specific status (in seconds).
 
 ```php
 $seconds = Workflow::for($invoice)->durationInStatus('REVIEW');
@@ -159,7 +160,110 @@ $seconds = Workflow::for($invoice)->durationInStatus('REVIEW');
 
 ---
 
-## Filtrer par rôle
+## Multi-Circuit
+
+### `allStatuses(): array`
+
+Returns the current basket per circuit.
+
+```php
+$statuses = Workflow::for($invoice)->allStatuses();
+// [
+//     'circuit-a-id' => ['circuit' => Circuit, 'basket' => Basket],
+//     'circuit-b-id' => ['circuit' => Circuit, 'basket' => Basket],
+// ]
+```
+
+### `circuits(): Collection`
+
+Lists all circuits the model belongs to.
+
+```php
+$circuits = Workflow::for($invoice)->circuits();
+```
+
+---
+
+## Resource Locking
+
+### `lock(?int $minutes = null): WorkflowLock`
+
+Lock the model for exclusive access. Defaults to `workflow.lock.duration_minutes` config.
+
+```php
+Workflow::for($invoice)->lock();     // Default duration
+Workflow::for($invoice)->lock(60);   // 1 hour
+```
+
+Throws `ModelLockedException` if already locked by another user. Extends the lock if called by the same user.
+
+### `unlock(bool $force = false): void`
+
+Release the lock. Only the lock owner can unlock unless `force: true`.
+
+```php
+Workflow::for($invoice)->unlock();
+Workflow::for($invoice)->unlock(force: true); // Admin override
+```
+
+### `isLocked(): bool`
+
+```php
+Workflow::for($invoice)->isLocked(); // true/false
+```
+
+### `isLockedByMe(): bool`
+
+```php
+Workflow::for($invoice)->isLockedByMe(); // true if current user holds the lock
+```
+
+### `lockedBy(): ?string`
+
+```php
+Workflow::for($invoice)->lockedBy(); // "user-uuid" or null
+```
+
+### `lockExpiration(): ?Carbon`
+
+```php
+Workflow::for($invoice)->lockExpiration(); // Carbon instance or null
+```
+
+---
+
+## Requirements
+
+### `requiredDocuments(string $nextBasketId): array`
+
+Returns documents required for a specific transition (from `require_document` actions).
+
+```php
+$docs = Workflow::for($invoice)->requiredDocuments($basketId);
+// [
+//     ['type' => 'id_card', 'label' => 'ID Card'],
+//     ['type' => 'proof_of_address', 'label' => 'Proof of Address'],
+// ]
+```
+
+### `requirements(): array`
+
+Returns all requirements for every available next transition.
+
+```php
+$reqs = Workflow::for($invoice)->requirements();
+// [
+//     'basket-uuid' => [
+//         'basket' => Basket,
+//         'label' => 'Approve',
+//         'documents' => [['type' => '...', 'label' => '...']],
+//     ],
+// ]
+```
+
+---
+
+## Role-Based Queries
 
 ### `circuitsForRole(string $role): Collection`
 
@@ -186,7 +290,7 @@ $baskets = Workflow::basketsForRole('validator', $circuit->id);
 $baskets = Workflow::basketsForRoles(['admin', 'operator'], $circuit->id);
 ```
 
-### Scopes Eloquent
+### Eloquent Scopes
 
 ```php
 Circuit::forRole('admin')->get();
@@ -198,19 +302,20 @@ $basket->hasRole('manager'); // true/false
 
 ---
 
-## Actions de transition
+## Transition Actions
 
-Les actions sont des classes exécutées automatiquement lors d'une transition spécifique. Elles sont **configurées visuellement** dans l'interface admin.
+Actions are classes executed automatically during a specific transition. They are **configured visually** in the admin UI.
 
-### Actions intégrées
+### Built-in actions
 
-| Action | Clé | Description |
+| Action | Key | Description |
 |---|---|---|
-| Envoyer un email | `send_email` | Envoie un message configuré dans le circuit |
-| Enregistrer dans les logs | `log` | Écrit une entrée dans les logs Laravel |
-| Appeler un webhook | `webhook` | Envoie un POST HTTP vers une URL |
+| Send email | `send_email` | Sends a message configured in the circuit |
+| Log | `log` | Writes a log entry |
+| Webhook | `webhook` | Sends an HTTP POST to a URL |
+| Require documents | `require_document` | Blocks transition if documents are missing |
 
-### Créer une action personnalisée
+### Creating a custom action
 
 ```bash
 php artisan make:workflow-action GeneratePdfAction
@@ -222,7 +327,7 @@ use Maestrodimateo\Workflow\Contracts\TransitionAction;
 class GeneratePdfAction implements TransitionAction
 {
     public static function key(): string { return 'generate_pdf'; }
-    public static function label(): string { return 'Generate Pdf'; }
+    public static function label(): string { return 'Generate PDF'; }
 
     public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
     {
@@ -231,31 +336,31 @@ class GeneratePdfAction implements TransitionAction
 }
 ```
 
-### Enregistrer une action
+### Registering an action
 
 ```php
-// Dans AppServiceProvider::boot()
+// In AppServiceProvider::boot()
 Workflow::registerAction(GeneratePdfAction::class);
 ```
 
-L'action apparaît automatiquement dans le menu "Ajouter" de l'interface admin.
+The action immediately appears in the admin UI's "Add action" menu.
 
-### Ordre d'exécution complet
+### Full execution order
 
 ```
-1. Vérification du lock (ModelLockedException si verrouillé par un autre)
-2. Déplacement du modèle (detach/attach)
-3. Actions configurées visuellement (JSON du pivot transition)
-4. TransitionEvent émis → HistoryListener enregistre l'historique
-5. Lock libéré automatiquement
-6. Vos listeners custom s'exécutent
+1. Lock guard (ModelLockedException if locked by another user)
+2. Model detached/attached (basket change)
+3. Transition actions executed (from pivot JSON config)
+4. TransitionEvent fired → HistoryListener records history
+5. Lock auto-released
+6. Your custom event listeners run
 ```
 
 ---
 
-## Event listeners
+## Event Listeners
 
-L'événement `TransitionEvent` est émis après chaque transition :
+A `TransitionEvent` is fired after every transition:
 
 ```php
 // EventServiceProvider
@@ -269,35 +374,37 @@ protected $listen = [
 ```php
 public function handle(TransitionEvent $event): void
 {
-    $event->currentBasket;  // Panier de départ
-    $event->nextBasket;     // Panier d'arrivée
-    $event->model;          // Le modèle transitionné
-    $event->comment;        // Le commentaire
+    $event->currentBasket; // Source basket
+    $event->nextBasket;    // Target basket
+    $event->model;         // The transitioned model
+    $event->comment;       // The comment
 }
 ```
 
 ---
 
-## Méthodes du trait Workflowable
+## Workflowable Trait
 
-Le trait ajoute des méthodes directement sur le modèle :
+The trait adds methods directly on your model:
 
 ```php
-$invoice->baskets;                       // Tous les paniers (toutes circuits)
-$invoice->histories;                     // Toutes les entrées d'historique
-$invoice->currentStatus();               // Dernier panier (tous circuits)
-$invoice->currentStatus($circuit);       // Panier actuel dans un circuit spécifique
-$invoice->workflowLock;                  // Le verrou actif (ou null)
+$invoice->baskets;                       // All baskets (across all circuits)
+$invoice->histories;                     // All history entries
+$invoice->currentStatus();               // Last basket (any circuit)
+$invoice->currentStatus($circuit);       // Current basket in a specific circuit
+$invoice->workflowLock;                  // Active lock (or null)
 
 // Scopes
-Invoice::fromBasket($basket)->get();     // Modèles dans un panier
-Invoice::unlocked()->get();              // Modèles disponibles (non verrouillés)
-Invoice::lockedBy($userId)->get();       // Modèles verrouillés par un utilisateur
+Invoice::fromBasket($basket)->get();     // Models in a specific basket
+Invoice::unlocked()->get();              // Available models (not locked)
+Invoice::lockedBy($userId)->get();       // Models locked by a specific user
 ```
 
 ---
 
-## Exemple complet
+## Examples
+
+### Basic controller
 
 ```php
 use Maestrodimateo\Workflow\Facades\Workflow;
@@ -329,12 +436,12 @@ class InvoiceController extends Controller
             $request->comment,
         );
 
-        return back()->with('success', 'Statut mis à jour');
+        return back()->with('success', 'Status updated');
     }
 }
 ```
 
-### Exemple avec suivi des durées
+### Duration tracking
 
 ```php
 class PerformanceController extends Controller
@@ -344,7 +451,7 @@ class PerformanceController extends Controller
         $wf = Workflow::for($invoice);
 
         return [
-            'total_seconds'  => $wf->totalDuration(),
+            'total_seconds'   => $wf->totalDuration(),
             'review_duration' => $wf->durationInStatus('REVIEW'),
             'steps' => $wf->history()->map(fn ($h) => [
                 'from'     => $h->previous_status,
@@ -358,25 +465,23 @@ class PerformanceController extends Controller
 }
 ```
 
-### Exemple multi-circuit
+### Multi-circuit
 
 ```php
 class InvoiceController extends Controller
 {
     public function dashboard(Invoice $invoice)
     {
-        // Voir le statut dans chaque circuit
         $statuses = Workflow::for($invoice)->allStatuses();
 
-        // Transitionner dans un circuit spécifique
         Workflow::for($invoice)
             ->in($approvalCircuitId)
-            ->transition($reviewBasketId, 'Envoyé pour validation');
+            ->transition($reviewBasketId, 'Sent for validation');
     }
 }
 ```
 
-### Exemple avec verrouillage
+### Locking
 
 ```php
 use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
@@ -387,7 +492,7 @@ class InvoiceController extends Controller
     {
         try {
             Workflow::for($invoice)->lock();
-            return back()->with('success', 'Dossier pris en charge');
+            return back()->with('success', 'Model locked');
         } catch (ModelLockedException $e) {
             return back()->withErrors(['lock' => $e->getMessage()]);
         }
@@ -397,7 +502,7 @@ class InvoiceController extends Controller
     {
         try {
             Workflow::for($invoice)->transition($request->basket_id);
-            return back()->with('success', 'Statut mis à jour');
+            return back()->with('success', 'Status updated');
         } catch (ModelLockedException $e) {
             return back()->withErrors(['lock' => $e->getMessage()]);
         }
@@ -406,12 +511,12 @@ class InvoiceController extends Controller
     public function release(Invoice $invoice)
     {
         Workflow::for($invoice)->unlock();
-        return back()->with('success', 'Dossier libéré');
+        return back()->with('success', 'Model unlocked');
     }
 }
 ```
 
-### Exemple avec action custom
+### Custom actions
 
 ```php
 // AppServiceProvider::boot()
