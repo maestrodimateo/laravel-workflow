@@ -13,8 +13,10 @@ Comes with a **built-in visual admin interface** to design your workflows by dra
 
 - **Visual workflow designer** — drag-and-drop baskets, draw transitions, configure actions
 - **Facade & helper** — `Workflow::for($model)->transition($basketId)` or `workflow($model)->transition($basketId)`
+- **Multi-circuit** — a model can belong to multiple workflows, scoped with `in($circuit)`
+- **Resource locking** — prevent concurrent access with `lock()` / `unlock()`
 - **Role-based access** — define allowed roles per circuit and per basket
-- **Transition actions** — attach actions (email, webhook, log, custom) to specific transitions, configured visually
+- **Transition actions** — attach actions (email, webhook, log, require documents, custom) to transitions
 - **Duration tracking** — automatic timing between steps with human-readable formatting
 - **Full history** — every transition is logged with who, when, how long, and why
 - **Message templates** — WYSIWYG editor with variable interpolation
@@ -120,12 +122,23 @@ $wf = Workflow::for($model);
 
 | Method | Returns | Description |
 |---|---|---|
+| `in($circuit)` | `WorkflowManager` | Scope to a specific circuit (required for multi-circuit) |
 | `currentStatus()` | `?Basket` | Current basket (step) of the model |
 | `nextBaskets()` | `Collection` | Available baskets to transition to |
 | `transition($id, $comment)` | `bool` | Move the model to the next basket |
 | `history()` | `Collection` | Full transition history with durations |
 | `totalDuration()` | `int` | Total processing time in seconds |
 | `durationInStatus($status)` | `int` | Time spent in a specific status (seconds) |
+| `allStatuses()` | `array` | Current basket per circuit |
+| `circuits()` | `Collection` | All circuits the model belongs to |
+| `lock($minutes)` | `WorkflowLock` | Lock the model for exclusive access |
+| `unlock($force)` | `void` | Release the lock |
+| `isLocked()` | `bool` | Check if locked |
+| `isLockedByMe()` | `bool` | Check if locked by the current user |
+| `lockedBy()` | `?string` | User ID holding the lock |
+| `lockExpiration()` | `?Carbon` | When the lock expires |
+| `requiredDocuments($basketId)` | `array` | Documents required for a transition |
+| `requirements()` | `array` | All requirements for all next transitions |
 
 ### Role-based queries
 
@@ -184,6 +197,91 @@ Human-readable formats: `45s`, `12min`, `2h 35min`, `3j 4h`.
 
 ---
 
+## Multi-Circuit Support
+
+A model can belong to multiple circuits simultaneously. Use `in()` to scope operations:
+
+```php
+// Scope to a specific circuit
+Workflow::for($invoice)->in($approvalCircuit)->currentStatus();
+Workflow::for($invoice)->in($complianceCircuit)->transition($basketId);
+Workflow::for($invoice)->in('circuit-uuid')->history();
+
+// See status in ALL circuits at once
+$statuses = Workflow::for($invoice)->allStatuses();
+// [
+//     'circuit-a-id' => ['circuit' => Circuit, 'basket' => Basket],
+//     'circuit-b-id' => ['circuit' => Circuit, 'basket' => Basket],
+// ]
+
+// List circuits the model belongs to
+$circuits = Workflow::for($invoice)->circuits();
+```
+
+When a model is created, it's automatically attached to the DRAFT basket of **every** circuit targeting its class.
+
+---
+
+## Resource Locking
+
+Prevent multiple operators from working on the same model simultaneously:
+
+```php
+// Lock the model (default: 30 minutes)
+Workflow::for($invoice)->lock();
+Workflow::for($invoice)->lock(60); // 1 hour
+
+// Check lock status
+Workflow::for($invoice)->isLocked();       // true
+Workflow::for($invoice)->isLockedByMe();   // true
+Workflow::for($invoice)->lockedBy();       // "user-uuid"
+Workflow::for($invoice)->lockExpiration(); // Carbon instance
+
+// Transition (auto-checks the lock)
+Workflow::for($invoice)->transition($basketId);
+// → OK if you hold the lock (lock is released after transition)
+// → ModelLockedException if locked by someone else
+
+// Release manually
+Workflow::for($invoice)->unlock();
+
+// Admin force unlock
+Workflow::for($invoice)->unlock(force: true);
+```
+
+### Query scopes
+
+```php
+// Available models (not locked or lock expired)
+Invoice::fromBasket($reviewBasket)->unlocked()->get();
+
+// Models I'm working on
+Invoice::lockedBy(auth()->id())->get();
+```
+
+### Handling lock exceptions
+
+```php
+use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
+
+try {
+    Workflow::for($invoice)->transition($basketId);
+} catch (ModelLockedException $e) {
+    return back()->withErrors([
+        'lock' => $e->getMessage(),
+        // "Ce dossier est verrouillé par [user] jusqu'à [14:30]."
+    ]);
+}
+```
+
+Configure the default lock duration in `.env`:
+
+```env
+WORKFLOW_LOCK_DURATION=30  # minutes
+```
+
+---
+
 ## Transition Actions
 
 Actions are executed automatically when a specific transition occurs. They are **configured visually** in the admin UI.
@@ -195,6 +293,7 @@ Actions are executed automatically when a specific transition occurs. They are *
 | Send email | `send_email` | Select a message from the circuit |
 | Log | `log` | Optional message |
 | Webhook | `webhook` | URL to POST to |
+| Require documents | `require_document` | List of documents (type + label) |
 
 ### Custom actions
 
@@ -204,7 +303,7 @@ Generate a new action with artisan:
 php artisan make:workflow-action GeneratePdfAction
 ```
 
-This creates `app/Actions/GeneratePdfAction.php`:
+This creates `app/Workflow/Actions/GeneratePdfAction.php`:
 
 ```php
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
@@ -258,10 +357,12 @@ public function handle(TransitionEvent $event): void
 ### What happens during a transition
 
 ```
-1. Model detached from current basket, attached to next
-2. Transition actions executed (configured visually on the link)
-3. TransitionEvent fired → HistoryListener records history with duration
-4. Your custom listeners run
+1. Lock guard — throws ModelLockedException if locked by another user
+2. Model detached from current basket, attached to next
+3. Transition actions executed (configured visually on the link)
+4. TransitionEvent fired → HistoryListener records history with duration
+5. Lock released automatically
+6. Your custom listeners run
 ```
 
 ---
@@ -330,6 +431,9 @@ return [
     ],
     'auth_identifier' => 'id',
     'message_variables' => [],
+    'lock' => [
+        'duration_minutes' => 30,
+    ],
 ];
 ```
 
@@ -340,12 +444,16 @@ return [
 The trait adds these methods directly on your model:
 
 ```php
-$invoice->baskets;          // All baskets (status history)
-$invoice->histories;        // All history entries
-$invoice->currentStatus();  // Current basket
+$invoice->baskets;                       // All baskets across all circuits
+$invoice->histories;                     // All history entries
+$invoice->currentStatus();               // Last basket (any circuit)
+$invoice->currentStatus($circuit);       // Current basket in a specific circuit
+$invoice->workflowLock;                  // Active lock (or null)
 
-// Scope: models in a specific basket
-Invoice::fromBasket($basket)->get();
+// Scopes
+Invoice::fromBasket($basket)->get();     // Models in a specific basket
+Invoice::unlocked()->get();              // Models not locked (or lock expired)
+Invoice::lockedBy($userId)->get();       // Models locked by a specific user
 ```
 
 ---

@@ -13,7 +13,7 @@ class Invoice extends Model
 }
 ```
 
-Dès qu'une instance de `Invoice` est créée, elle est automatiquement placée dans le premier panier (DRAFT) du circuit qui la cible.
+Dès qu'une instance de `Invoice` est créée, elle est automatiquement placée dans le panier DRAFT de **tous les circuits** qui ciblent ce modèle.
 
 ---
 
@@ -44,6 +44,17 @@ Lie le manager à un modèle. Retourne une **nouvelle instance** pour permettre 
 
 ```php
 $wf = Workflow::for($invoice);
+```
+
+---
+
+### `in(string|Circuit $circuit): WorkflowManager`
+
+Scope toutes les opérations à un circuit spécifique. Nécessaire quand le modèle appartient à plusieurs circuits.
+
+```php
+Workflow::for($invoice)->in($approvalCircuit)->currentStatus();
+Workflow::for($invoice)->in('circuit-uuid')->transition($basketId);
 ```
 
 ---
@@ -232,10 +243,12 @@ L'action apparaît automatiquement dans le menu "Ajouter" de l'interface admin.
 ### Ordre d'exécution complet
 
 ```
-1. Déplacement du modèle (detach/attach)
-2. Actions configurées visuellement (JSON du pivot transition)
-3. TransitionEvent émis → HistoryListener enregistre l'historique
-4. Vos listeners custom s'exécutent
+1. Vérification du lock (ModelLockedException si verrouillé par un autre)
+2. Déplacement du modèle (detach/attach)
+3. Actions configurées visuellement (JSON du pivot transition)
+4. TransitionEvent émis → HistoryListener enregistre l'historique
+5. Lock libéré automatiquement
+6. Vos listeners custom s'exécutent
 ```
 
 ---
@@ -270,12 +283,16 @@ public function handle(TransitionEvent $event): void
 Le trait ajoute des méthodes directement sur le modèle :
 
 ```php
-$invoice->baskets;          // Tous les paniers (historique des statuts)
-$invoice->histories;        // Toutes les entrées d'historique
-$invoice->currentStatus();  // Panier actuel
+$invoice->baskets;                       // Tous les paniers (toutes circuits)
+$invoice->histories;                     // Toutes les entrées d'historique
+$invoice->currentStatus();               // Dernier panier (tous circuits)
+$invoice->currentStatus($circuit);       // Panier actuel dans un circuit spécifique
+$invoice->workflowLock;                  // Le verrou actif (ou null)
 
-// Scope : modèles dans un panier donné
-Invoice::fromBasket($basket)->get();
+// Scopes
+Invoice::fromBasket($basket)->get();     // Modèles dans un panier
+Invoice::unlocked()->get();              // Modèles disponibles (non verrouillés)
+Invoice::lockedBy($userId)->get();       // Modèles verrouillés par un utilisateur
 ```
 
 ---
@@ -337,6 +354,59 @@ class PerformanceController extends Controller
                 'at'       => $h->created_at->toDateTimeString(),
             ]),
         ];
+    }
+}
+```
+
+### Exemple multi-circuit
+
+```php
+class InvoiceController extends Controller
+{
+    public function dashboard(Invoice $invoice)
+    {
+        // Voir le statut dans chaque circuit
+        $statuses = Workflow::for($invoice)->allStatuses();
+
+        // Transitionner dans un circuit spécifique
+        Workflow::for($invoice)
+            ->in($approvalCircuitId)
+            ->transition($reviewBasketId, 'Envoyé pour validation');
+    }
+}
+```
+
+### Exemple avec verrouillage
+
+```php
+use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
+
+class InvoiceController extends Controller
+{
+    public function take(Invoice $invoice)
+    {
+        try {
+            Workflow::for($invoice)->lock();
+            return back()->with('success', 'Dossier pris en charge');
+        } catch (ModelLockedException $e) {
+            return back()->withErrors(['lock' => $e->getMessage()]);
+        }
+    }
+
+    public function transition(Request $request, Invoice $invoice)
+    {
+        try {
+            Workflow::for($invoice)->transition($request->basket_id);
+            return back()->with('success', 'Statut mis à jour');
+        } catch (ModelLockedException $e) {
+            return back()->withErrors(['lock' => $e->getMessage()]);
+        }
+    }
+
+    public function release(Invoice $invoice)
+    {
+        Workflow::for($invoice)->unlock();
+        return back()->with('success', 'Dossier libéré');
     }
 }
 ```
