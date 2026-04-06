@@ -338,8 +338,8 @@
 
             /**
              * Extract the hex color string from a value that may be an object (enum) or string.
-             * @param {string|Object} colorValue - Color value or enum object
-             * @returns {string} Hex color string
+             * param: {string|Object} colorValue - Color value or enum object
+             * returns: {string} Hex color string
              */
             resolveColor(colorValue) {
                 if (colorValue && typeof colorValue === 'object') return colorValue.value;
@@ -348,8 +348,8 @@
 
             /**
              * Get the position of a basket node, accounting for live drag position.
-             * @param {string} basketId
-             * @returns {{ x: number, y: number }}
+             * param: {string} basketId
+             * returns: {{ x: number, y: number }}
              */
             getNodePosition(basketId) {
                 if (this.draggedNodeId === basketId) {
@@ -360,8 +360,8 @@
 
             /**
              * Toggle a value in an array (add if absent, remove if present).
-             * @param {Array} array
-             * @param {*} value
+             * param: {Array} array
+             * param: {*} value
              */
             toggleArrayValue(array, value) {
                 const index = array.indexOf(value);
@@ -376,8 +376,8 @@
 
             /**
              * Show a toast notification.
-             * @param {string} message - Text to display
-             * @param {boolean} [isSuccess=true] - Whether it's a success (true) or error (false)
+             * param: {string} message - Text to display
+             * param: {boolean} [isSuccess=true] - Whether it's a success (true) or error (false)
              */
             showToast(message, isSuccess = true) {
                 this.toast = { on: true, msg: message, ok: isSuccess };
@@ -386,8 +386,8 @@
 
             /**
              * Safely parse a JSON string or return the array if already parsed.
-             * @param {string|Array} value
-             * @returns {Array}
+             * param: {string|Array} value
+             * returns: {Array}
              */
             parseActionsJson(value) {
                 try {
@@ -401,8 +401,8 @@
 
             /**
              * Get the human-readable label for a transition action key.
-             * @param {string} actionKey
-             * @returns {string}
+             * param: {string} actionKey
+             * returns: {string}
              */
             getActionLabel(actionKey) {
                 return this.availableActions.find(a => a.key === actionKey)?.label || actionKey;
@@ -475,11 +475,11 @@
             /**
              * Make an authenticated API request to the admin backend.
              *
-             * @param {string} method - HTTP method (GET, POST, PUT, DELETE)
-             * @param {string} path - API path relative to the base URL
-             * @param {Object|null} body - Request body (will be JSON-serialized)
-             * @returns {Promise<Object|null>} Parsed JSON response or null for 204
-             * @throws {Error} On non-2xx response with the server error message
+             * param: {string} method - HTTP method (GET, POST, PUT, DELETE)
+             * param: {string} path - API path relative to the base URL
+             * param: {Object|null} body - Request body (will be JSON-serialized)
+             * returns: {Promise<Object|null>} Parsed JSON response or null for 204
+             * throws: {Error} On non-2xx response with the server error message
              */
             async api(method, path, body = null) {
                 this.validationErrors = {};
@@ -526,7 +526,7 @@
             /**
              * Initialize the Quill editor inside the given DOM element.
              * Syncs content bidirectionally with messageForm.content.
-             * @param {HTMLElement} container
+             * param: {HTMLElement} container
              */
             initQuill(container) {
                 this.$nextTick(() => {
@@ -563,7 +563,7 @@
             /**
              * Insert a template variable placeholder at the cursor position in Quill.
              * Falls back to appending at the end if no selection exists.
-             * @param {string} variableKey - The variable name (e.g. 'user', 'date')
+             * param: {string} variableKey - The variable name (e.g. 'user', 'date')
              */
             insertVariable(variableKey) {
                 if (!this.quillEditor) return;
@@ -590,7 +590,7 @@
 
             /**
              * Select a circuit, reset diagram state, and compute layout.
-             * @param {Object} circuitData - Circuit object with baskets
+             * param: {Object} circuitData - Circuit object with baskets
              */
             selectCircuit(circuitData) {
                 this.stopEdgeAnimation();
@@ -617,7 +617,7 @@
              * Root nodes (no predecessors) are placed in the first column,
              * their successors in the next, etc.
              *
-             * @param {boolean} force - If true, recompute all positions. If false, only assign positions to new baskets.
+             * param: {boolean} force - If true, recompute all positions. If false, only assign positions to new baskets.
              */
             computeLayout(force = false) {
                 const allBaskets = this.baskets;
@@ -654,9 +654,9 @@
 
             /**
              * Build columns of baskets via BFS traversal.
-             * @param {Array} allBaskets
-             * @returns {Array<Array>} Array of columns, each containing basket objects
-             * @private
+             * param: {Array} allBaskets
+             * returns: {Array<Array>} Array of columns, each containing basket objects
+             * private
              */
             _buildBfsColumns(allBaskets) {
                 const visited = new Set();
@@ -711,7 +711,7 @@
 
             /**
              * Set the zoom level, clamped between 0.3 and 2.0.
-             * @param {number} value
+             * param: {number} value
              */
             setZoom(value) {
                 this.zoomLevel = Math.max(0.3, Math.min(2, value));
@@ -719,7 +719,7 @@
 
             /**
              * Handle mouse wheel for zooming.
-             * @param {WheelEvent} event
+             * param: {WheelEvent} event
              */
             onWheel(event) {
                 const delta = event.deltaY < 0 ? 0.05 : -0.05;
@@ -734,8 +734,8 @@
              * Begin dragging a basket node.
              * Caches the canvas rect and computes the mouse-to-node offset.
              *
-             * @param {MouseEvent} event
-             * @param {Object} basket - The basket being dragged
+             * param: {MouseEvent} event
+             * param: {Object} basket - The basket being dragged
              */
             startDrag(event, basket) {
                 if (this.linkSource) return; // Don't drag while linking
@@ -758,7 +758,7 @@
              * Handle mouse movement on the canvas.
              * Updates drag position or linking preview line.
              *
-             * @param {MouseEvent} event
+             * param: {MouseEvent} event
              */
             onMove(event) {
                 const canvas = this.$refs.canvas;
@@ -816,7 +816,7 @@
 
             /**
              * Start a visual link from a basket's output port.
-             * @param {Object} sourceBasket
+             * param: {Object} sourceBasket
              */
             startLink(sourceBasket) {
                 this.linkSource = sourceBasket;
@@ -827,7 +827,7 @@
              * Complete a visual link by connecting to a target basket.
              * Called when mouse is released on the input port or when the card is clicked.
              *
-             * @param {Object} targetBasket
+             * param: {Object} targetBasket
              */
             completeLink(targetBasket) {
                 if (!this.linkSource) return;
@@ -855,7 +855,7 @@
              * Handle click on a basket node.
              * During linking: completes the link. Otherwise: selects the basket.
              *
-             * @param {Object} basket
+             * param: {Object} basket
              */
             onNodeClick(basket) {
                 if (this.hasDragged) return;
@@ -871,8 +871,8 @@
 
             /**
              * Create a transition between two baskets via the API.
-             * @param {Object} fromBasket
-             * @param {Object} toBasket
+             * param: {Object} fromBasket
+             * param: {Object} toBasket
              */
             async createTransition(fromBasket, toBasket) {
                 const sourceId = fromBasket.id;
@@ -901,8 +901,8 @@
 
             /**
              * Remove a transition between two baskets.
-             * @param {Object} fromBasket
-             * @param {Object} toBasket
+             * param: {Object} fromBasket
+             * param: {Object} toBasket
              */
             async removeLink(fromBasket, toBasket) {
                 try {
@@ -941,16 +941,16 @@
 
             /**
              * Compute a point on a cubic Bézier curve at parameter t.
-             * @param {number} x1 - Start X
-             * @param {number} y1 - Start Y
-             * @param {number} cx1 - Control point 1 X
-             * @param {number} cy1 - Control point 1 Y
-             * @param {number} cx2 - Control point 2 X
-             * @param {number} cy2 - Control point 2 Y
-             * @param {number} x2 - End X
-             * @param {number} y2 - End Y
-             * @param {number} t - Parameter (0 = start, 1 = end)
-             * @returns {{ x: number, y: number }}
+             * param: {number} x1 - Start X
+             * param: {number} y1 - Start Y
+             * param: {number} cx1 - Control point 1 X
+             * param: {number} cy1 - Control point 1 Y
+             * param: {number} cx2 - Control point 2 X
+             * param: {number} cy2 - Control point 2 Y
+             * param: {number} x2 - End X
+             * param: {number} y2 - End Y
+             * param: {number} t - Parameter (0 = start, 1 = end)
+             * returns: {{ x: number, y: number }}
              */
             bezierPoint(x1, y1, cx1, cy1, cx2, cy2, x2, y2, t) {
                 const u = 1 - t;
@@ -1050,13 +1050,13 @@
 
             /**
              * Draw a single edge between two positions.
-             * @param {CanvasRenderingContext2D} ctx
-             * @param {{ x: number, y: number }} fromPos
-             * @param {{ x: number, y: number }} toPos
-             * @param {boolean} isSelected
-             * @param {string|null} label
-             * @param {Object} colors - Color palette
-             * @private
+             * param: {CanvasRenderingContext2D} ctx
+             * param: {{ x: number, y: number }} fromPos
+             * param: {{ x: number, y: number }} toPos
+             * param: {boolean} isSelected
+             * param: {string|null} label
+             * param: {Object} colors - Color palette
+             * private
              */
             _drawEdge(ctx, fromPos, toPos, isSelected, label, colors) {
                 // Compute Bézier control points
@@ -1120,7 +1120,7 @@
 
             /**
              * Draw a label badge at the midpoint of an edge.
-             * @private
+             * private
              */
             _drawEdgeLabel(ctx, x1, y1, cx1, cy1, cx2, cy2, x2, y2, label, colors) {
                 const midpoint = this.bezierPoint(x1, y1, cx1, cy1, cx2, cy2, x2, y2, 0.5);
@@ -1156,9 +1156,9 @@
 
             /**
              * Draw the temporary dashed line while creating a link.
-             * @param {CanvasRenderingContext2D} ctx
-             * @param {boolean} isDark
-             * @private
+             * param: {CanvasRenderingContext2D} ctx
+             * param: {boolean} isDark
+             * private
              */
             _drawLinkingPreview(ctx, isDark) {
                 const sourcePos = this.getNodePosition(this.linkSource.id);
@@ -1502,8 +1502,8 @@
 
             /**
              * Open the transition config modal for a specific link.
-             * @param {Object} fromBasket
-             * @param {Object} toBasket
+             * param: {Object} fromBasket
+             * param: {Object} toBasket
              */
             openTransitionConfig(fromBasket, toBasket) {
                 const pivot = toBasket.pivot || {};
@@ -1518,7 +1518,7 @@
 
             /**
              * Add a new action to the transition config.
-             * @param {string} actionKey
+             * param: {string} actionKey
              */
             addTransitionAction(actionKey) {
                 this.transitionConfig.actions.push({ type: actionKey, config: {} });
