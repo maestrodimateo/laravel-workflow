@@ -1089,14 +1089,28 @@
              * private
              */
             _drawEdge(ctx, fromPos, toPos, isSelected, label, colors) {
-                // Compute Bézier control points
-                const x1 = fromPos.x + NODE_WIDTH;
+                // Smart routing: adapt control points based on relative position
+                const x1 = fromPos.x + NODE_WIDTH;  // right edge of source
                 const y1 = fromPos.y + NODE_HEIGHT / 2;
-                const x2 = toPos.x;
+                const x2 = toPos.x;                  // left edge of target
                 const y2 = toPos.y + NODE_HEIGHT / 2;
-                const curvature = Math.max(Math.abs(x2 - x1) * 0.5, 70);
-                const cx1 = x1 + curvature, cy1 = y1;
-                const cx2 = x2 - curvature, cy2 = y2;
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+
+                let cx1, cy1, cx2, cy2;
+
+                if (dx > 40) {
+                    // Normal case: target is to the right — smooth horizontal curve
+                    const curve = Math.max(dx * 0.4, 50);
+                    cx1 = x1 + curve; cy1 = y1;
+                    cx2 = x2 - curve; cy2 = y2;
+                } else {
+                    // Target is to the left or very close — route around with a loop
+                    const detour = Math.max(80, Math.abs(dy) * 0.5);
+                    const side = dy >= 0 ? -1 : 1; // go above if target is below, below if above
+                    cx1 = x1 + detour; cy1 = y1 + side * detour;
+                    cx2 = x2 - detour; cy2 = y2 + side * detour;
+                }
 
                 // Shadow
                 ctx.beginPath();
