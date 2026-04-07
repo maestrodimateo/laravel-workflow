@@ -625,24 +625,54 @@
 
                 const columns = this._buildBfsColumns(allBaskets);
                 const maxRowCount = Math.max(...columns.map(col => col.length));
+                const colCount = columns.length;
 
-                const GAP_X = 140;
-                const GAP_Y = 40;
-                const PADDING_X = 60;
-                const PADDING_Y = 60;
+                // Get available canvas size
+                const canvas = this.$refs.canvas;
+                const availW = canvas ? canvas.clientWidth - 40 : 800;
+                const availH = canvas ? canvas.clientHeight - 40 : 600;
+
+                const PADDING_X = 30;
+                const PADDING_Y = 30;
+                const usableW = availW - PADDING_X * 2;
+                const usableH = availH - PADDING_Y * 2;
+
+                // Compute gaps dynamically to fit the screen
+                // Minimum gaps to keep things readable
+                const MIN_GAP_X = 40;
+                const MIN_GAP_Y = 20;
+                const IDEAL_GAP_X = 140;
+                const IDEAL_GAP_Y = 40;
+
+                let gapX = colCount > 1
+                    ? Math.max(MIN_GAP_X, Math.min(IDEAL_GAP_X, (usableW - colCount * NODE_WIDTH) / (colCount - 1)))
+                    : IDEAL_GAP_X;
+
+                let gapY = maxRowCount > 1
+                    ? Math.max(MIN_GAP_Y, Math.min(IDEAL_GAP_Y, (usableH - maxRowCount * NODE_HEIGHT) / (maxRowCount - 1)))
+                    : IDEAL_GAP_Y;
+
+                // If it still doesn't fit, shrink the zoom to fit
+                const totalW = PADDING_X * 2 + colCount * NODE_WIDTH + (colCount - 1) * gapX;
+                const totalH = PADDING_Y * 2 + maxRowCount * NODE_HEIGHT + (maxRowCount - 1) * gapY;
+
+                if (force && (totalW > availW || totalH > availH)) {
+                    const fitZoom = Math.min(availW / totalW, availH / totalH, 1);
+                    this.zoomLevel = Math.max(0.3, Math.round(fitZoom * 20) / 20); // Round to nearest 0.05
+                }
 
                 const newPositions = force ? {} : { ...this.nodePositions };
 
                 columns.forEach((column, columnIndex) => {
-                    const columnHeight = column.length * NODE_HEIGHT + (column.length - 1) * GAP_Y;
-                    const maxColumnHeight = maxRowCount * NODE_HEIGHT + (maxRowCount - 1) * GAP_Y;
+                    const columnHeight = column.length * NODE_HEIGHT + (column.length - 1) * gapY;
+                    const maxColumnHeight = maxRowCount * NODE_HEIGHT + (maxRowCount - 1) * gapY;
                     const verticalOffset = (maxColumnHeight - columnHeight) / 2;
 
                     column.forEach((basket, rowIndex) => {
                         if (force || !newPositions[basket.id]) {
                             newPositions[basket.id] = {
-                                x: PADDING_X + columnIndex * (NODE_WIDTH + GAP_X),
-                                y: PADDING_Y + verticalOffset + rowIndex * (NODE_HEIGHT + GAP_Y),
+                                x: PADDING_X + columnIndex * (NODE_WIDTH + gapX),
+                                y: PADDING_Y + verticalOffset + rowIndex * (NODE_HEIGHT + gapY),
                             };
                         }
                     });
