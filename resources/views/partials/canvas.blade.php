@@ -25,7 +25,7 @@
 
     {{-- Zoom wrapper --}}
     <div :style="'transform:scale('+zoom+');transform-origin:0 0;width:'+(canvasW/zoom)+'px;height:'+(canvasH/zoom)+'px;min-width:'+canvasW+'px;min-height:'+canvasH+'px'"
-         @wheel.prevent="onWheel($event)">
+>
 
         {{-- Canvas for edge rendering --}}
         <canvas x-ref="edgeCanvas"
