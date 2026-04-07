@@ -107,6 +107,8 @@ class WorkflowManager
     // -------------------------------------------------------------------------
 
     /**
+     * Transition a single model to the next basket.
+     *
      * @throws \Throwable
      * @throws ModelLockedException If the model is locked by another user
      */
@@ -124,11 +126,86 @@ class WorkflowManager
 
             event(new TransitionEvent($currentBasket, $nextBasket, $this->subject, $comment));
 
-            // Release the lock after a successful transition
             $this->unlock();
 
             return true;
         });
+    }
+
+    /**
+     * Transition multiple models to the same basket in a single transaction.
+     *
+     * Models locked by another user are skipped (not thrown).
+     * Returns the count of successfully transitioned models and the list of skipped ones.
+     *
+     *     $result = Workflow::transitionMany($invoices, $basketId, 'Batch approved');
+     *     $result['transitioned']; // 8
+     *     $result['skipped'];      // [['model' => Model, 'reason' => 'locked by ...']]
+     *
+     * @param  iterable<Model>  $models  Collection or array of models
+     * @param  string  $nextBasketId  Target basket UUID
+     * @param  string|null  $comment  Optional comment for all transitions
+     * @return array{transitioned: int, skipped: array}
+     *
+     * @throws \Throwable
+     */
+    public function transitionMany(iterable $models, string $nextBasketId, ?string $comment = null): array
+    {
+        $nextBasket = Basket::query()->findOrFail($nextBasketId);
+        $transitioned = 0;
+        $skipped = [];
+
+        DB::transaction(function () use ($models, $nextBasket, $comment, &$transitioned, &$skipped) {
+            foreach ($models as $model) {
+                $wf = $this->for($model);
+
+                if ($this->circuitId) {
+                    $wf = $wf->in($this->circuitId);
+                }
+
+                // Skip locked models
+                $lock = null;
+                $model->load('workflowLock');
+                if ($model->workflowLock && $model->workflowLock->isActive()) {
+                    $lockOwner = $model->workflowLock->locked_by;
+                    $currentUser = $this->currentUserId();
+                    if ($lockOwner !== $currentUser) {
+                        $skipped[] = [
+                            'model' => $model,
+                            'reason' => "Locked by [{$lockOwner}]",
+                        ];
+
+                        continue;
+                    }
+                }
+
+                $currentBasket = $wf->currentStatus();
+                if (! $currentBasket) {
+                    $skipped[] = [
+                        'model' => $model,
+                        'reason' => 'No current status',
+                    ];
+
+                    continue;
+                }
+
+                $this->repository->moveModelToNextBasket($currentBasket, $nextBasket, $model);
+                $this->executeTransitionActions($currentBasket, $nextBasket);
+                event(new TransitionEvent($currentBasket, $nextBasket, $model, $comment));
+
+                // Release lock if held
+                if ($model->workflowLock) {
+                    $model->workflowLock->delete();
+                }
+
+                $transitioned++;
+            }
+        });
+
+        return [
+            'transitioned' => $transitioned,
+            'skipped' => $skipped,
+        ];
     }
 
     private function executeTransitionActions(Basket $from, Basket $to): void

@@ -15,6 +15,7 @@ use Maestrodimateo\Workflow\WorkflowManager;
  * @method static Basket|null currentStatus()
  * @method static \Illuminate\Support\Collection nextBaskets()
  * @method static bool transition(string $nextBasketId, ?string $comment = null)
+ * @method static array transitionMany(iterable $models, string $nextBasketId, ?string $comment = null)
  * @method static Collection history()
  * @method static array requiredDocuments(string $nextBasketId)
  * @method static array requirements()
