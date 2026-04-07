@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Events\TransitionEvent;
 use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
@@ -13,6 +14,7 @@ use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Circuit;
 use Maestrodimateo\Workflow\Models\WorkflowLock;
 use Maestrodimateo\Workflow\Repositories\BasketRepository;
+use Throwable;
 
 class WorkflowManager
 {
@@ -109,7 +111,7 @@ class WorkflowManager
     /**
      * Transition a single model to the next basket.
      *
-     * @throws \Throwable
+     * @throws Throwable
      * @throws ModelLockedException If the model is locked by another user
      */
     public function transition(string $nextBasketId, ?string $comment = null): bool
@@ -133,79 +135,142 @@ class WorkflowManager
     }
 
     /**
-     * Transition multiple models to the same basket in a single transaction.
+     * Transition multiple models to the same basket using bulk SQL.
      *
-     * Models locked by another user are skipped (not thrown).
-     * Returns the count of successfully transitioned models and the list of skipped ones.
+     * Performance: ~6 queries regardless of model count (instead of ~5N).
+     * Transition actions are NOT executed in bulk mode (they need per-model context).
+     * Use single transition() if you need actions on each model.
      *
      *     $result = Workflow::transitionMany($invoices, $basketId, 'Batch approved');
      *     $result['transitioned']; // 8
-     *     $result['skipped'];      // [['model' => Model, 'reason' => 'locked by ...']]
+     *     $result['skipped'];      // [['id' => '...', 'reason' => '...']]
      *
      * @param  iterable<Model>  $models  Collection or array of models
      * @param  string  $nextBasketId  Target basket UUID
      * @param  string|null  $comment  Optional comment for all transitions
      * @return array{transitioned: int, skipped: array}
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function transitionMany(iterable $models, string $nextBasketId, ?string $comment = null): array
     {
         $nextBasket = Basket::query()->findOrFail($nextBasketId);
-        $transitioned = 0;
-        $skipped = [];
+        $models = collect($models);
 
-        DB::transaction(function () use ($models, $nextBasket, $comment, &$transitioned, &$skipped) {
-            foreach ($models as $model) {
-                $wf = $this->for($model);
+        if ($models->isEmpty()) {
+            return ['transitioned' => 0, 'skipped' => []];
+        }
 
-                if ($this->circuitId) {
-                    $wf = $wf->in($this->circuitId);
-                }
+        $modelType = $models->first()::class;
+        $modelIds = $models->pluck('id')->all();
+        $currentUserId = $this->currentUserId();
+        $now = now();
 
-                // Skip locked models
-                $lock = null;
-                $model->load('workflowLock');
-                if ($model->workflowLock && $model->workflowLock->isActive()) {
-                    $lockOwner = $model->workflowLock->locked_by;
-                    $currentUser = $this->currentUserId();
-                    if ($lockOwner !== $currentUser) {
-                        $skipped[] = [
-                            'model' => $model,
-                            'reason' => "Locked by [{$lockOwner}]",
-                        ];
+        return DB::transaction(function () use ($modelType, $modelIds, $nextBasket, $comment, $currentUserId, $now) {
 
-                        continue;
-                    }
-                }
+            // 1. Current basket per model (1 query)
+            $assignmentQuery = DB::table('statusable')
+                ->where('statusable_type', $modelType)
+                ->whereIn('statusable_id', $modelIds);
 
-                $currentBasket = $wf->currentStatus();
-                if (! $currentBasket) {
-                    $skipped[] = [
-                        'model' => $model,
-                        'reason' => 'No current status',
-                    ];
-
-                    continue;
-                }
-
-                $this->repository->moveModelToNextBasket($currentBasket, $nextBasket, $model);
-                $this->executeTransitionActions($currentBasket, $nextBasket);
-                event(new TransitionEvent($currentBasket, $nextBasket, $model, $comment));
-
-                // Release lock if held
-                if ($model->workflowLock) {
-                    $model->workflowLock->delete();
-                }
-
-                $transitioned++;
+            if ($this->circuitId) {
+                $circuitBasketIds = Basket::where('circuit_id', $this->circuitId)->pluck('id');
+                $assignmentQuery->whereIn('basket_id', $circuitBasketIds);
             }
-        });
 
-        return [
-            'transitioned' => $transitioned,
-            'skipped' => $skipped,
-        ];
+            $currentAssignments = $assignmentQuery->get()
+                ->groupBy('statusable_id')
+                ->map(fn ($rows) => $rows->sortByDesc('created_at')->first());
+
+            // 2. Locked by others (1 query)
+            $lockedByOthers = DB::table('workflow_locks')
+                ->where('lockable_type', $modelType)
+                ->whereIn('lockable_id', $modelIds)
+                ->where('expires_at', '>', $now)
+                ->where('locked_by', '!=', $currentUserId)
+                ->pluck('locked_by', 'lockable_id');
+
+            // 3. Partition eligible vs skipped
+            $skipped = [];
+            $eligible = []; // id => current_basket_id
+
+            foreach ($modelIds as $id) {
+                if ($lockedByOthers->has($id)) {
+                    $skipped[] = ['id' => $id, 'reason' => "Locked by [{$lockedByOthers[$id]}]"];
+                } elseif (! $currentAssignments->has($id)) {
+                    $skipped[] = ['id' => $id, 'reason' => 'No current status'];
+                } else {
+                    $eligible[$id] = $currentAssignments[$id]->basket_id;
+                }
+            }
+
+            if (empty($eligible)) {
+                return ['transitioned' => 0, 'skipped' => $skipped];
+            }
+
+            $eligibleIds = array_keys($eligible);
+            $previousBasketIds = array_unique(array_values($eligible));
+
+            // 4. Bulk detach (1 query)
+            DB::table('statusable')
+                ->where('statusable_type', $modelType)
+                ->whereIn('statusable_id', $eligibleIds)
+                ->whereIn('basket_id', $previousBasketIds)
+                ->delete();
+
+            // 5. Bulk attach (1 query)
+            DB::table('statusable')->insert(
+                array_map(fn ($id) => [
+                    'statusable_type' => $modelType,
+                    'statusable_id' => $id,
+                    'basket_id' => $nextBasket->id,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ], $eligibleIds)
+            );
+
+            // 6. Bulk history insert (1 query)
+            $previousStatuses = Basket::whereIn('id', $previousBasketIds)->pluck('status', 'id');
+
+            $lastDates = DB::table('histories')
+                ->where('historable_type', $modelType)
+                ->whereIn('historable_id', $eligibleIds)
+                ->groupBy('historable_id')
+                ->selectRaw('historable_id, MAX(created_at) as last_at')
+                ->pluck('last_at', 'historable_id');
+
+            $creationDates = DB::table((new $modelType)->getTable())
+                ->whereIn('id', $eligibleIds)
+                ->pluck('created_at', 'id');
+
+            DB::table('histories')->insert(
+                array_map(function ($id) use ($eligible, $previousStatuses, $nextBasket, $comment, $currentUserId, $now, $lastDates, $creationDates, $modelType) {
+                    $since = $lastDates[$id] ?? $creationDates[$id] ?? null;
+                    $duration = $since ? (int) $now->diffInSeconds(Carbon::parse($since)) : null;
+
+                    return [
+                        'id' => Str::uuid()->toString(),
+                        'historable_type' => $modelType,
+                        'historable_id' => $id,
+                        'previous_status' => $previousStatuses[$eligible[$id]] ?? 'UNKNOWN',
+                        'next_status' => $nextBasket->status,
+                        'comment' => $comment,
+                        'done_by' => $currentUserId,
+                        'duration_seconds' => $duration,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }, $eligibleIds)
+            );
+
+            // 7. Bulk release locks (1 query)
+            DB::table('workflow_locks')
+                ->where('lockable_type', $modelType)
+                ->whereIn('lockable_id', $eligibleIds)
+                ->delete();
+
+            return ['transitioned' => count($eligibleIds), 'skipped' => $skipped];
+        });
     }
 
     private function executeTransitionActions(Basket $from, Basket $to): void
