@@ -571,7 +571,7 @@
                 this.quillEditor.focus();
                 const selection = this.quillEditor.getSelection();
                 const insertAt = selection ? selection.index : this.quillEditor.getLength() - 1;
-                const placeholder = '{{ ' + variableKey + ' }}';
+                const placeholder = String.fromCharCode(123, 123) + ' ' + variableKey + ' ' + String.fromCharCode(125, 125);
 
                 this.quillEditor.insertText(insertAt, placeholder);
                 this.quillEditor.setSelection(insertAt + placeholder.length);
