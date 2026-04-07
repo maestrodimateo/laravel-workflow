@@ -162,15 +162,6 @@ class WorkflowManager
         }
 
         $modelType = $models->first()::class;
-
-        // All models must be the same type
-        $mixedTypes = $models->contains(fn ($m) => $m::class !== $modelType);
-        if ($mixedTypes) {
-            throw new \InvalidArgumentException(
-                'transitionMany() only accepts models of a single type. Got mixed types.'
-            );
-        }
-
         $modelIds = $models->pluck('id')->all();
         $currentUserId = $this->currentUserId();
         $now = now();
