@@ -30,7 +30,7 @@ class WorkflowAdminController extends Controller
             'recipients' => collect(RecipientType::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
             'actions' => $actions,
             'variables' => MessageVariableResolver::availableKeys(),
-            'apiPrefix' => '/'.trim(config('workflow.routes.prefix', 'workflow'), '/').'/admin/api',
+            'apiPrefix' => './admin/api',
         ]);
     }
 
