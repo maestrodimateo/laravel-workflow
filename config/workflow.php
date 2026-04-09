@@ -41,6 +41,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Custom Transition Actions
+    |--------------------------------------------------------------------------
+    | Register your own transition actions here. Each entry must be a
+    | fully qualified class name extending TransitionAction.
+    |
+    | Example:
+    | 'actions' => [
+    |     App\Workflow\Actions\CreateAcademicYearAction::class,
+    |     App\Workflow\Actions\NotifySlackAction::class,
+    | ],
+    */
+    'actions' => [],
+
+    /*
+    |--------------------------------------------------------------------------
     | Resource Locking
     |--------------------------------------------------------------------------
     | When an operator locks a model, no one else can transition it

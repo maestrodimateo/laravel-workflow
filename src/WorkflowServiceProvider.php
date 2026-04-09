@@ -51,6 +51,10 @@ class WorkflowServiceProvider extends ServiceProvider
         WorkflowManager::registerAction(LogTransitionAction::class);
         WorkflowManager::registerAction(WebhookAction::class);
         WorkflowManager::registerAction(RequireDocumentAction::class);
+
+        foreach (config('workflow.actions', []) as $actionClass) {
+            WorkflowManager::registerAction($actionClass);
+        }
     }
 
     private function loadRoutes(): void
