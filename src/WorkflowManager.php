@@ -623,4 +623,96 @@ class WorkflowManager
     {
         return Circuit::forRoles($roles)->with('baskets')->get();
     }
+
+    // -------------------------------------------------------------------------
+    // Programmatic import (seeders, commands, etc.)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Import a circuit from a JSON file exported via the admin panel.
+     *
+     * Intended for seeders and artisan commands — no HTTP request needed.
+     * Uses a transaction to ensure consistency; rolls back on any failure.
+     *
+     *     Workflow::importFromJson(database_path('seeders/workflow-invoices.json'));
+     *
+     * @param  string  $path  Absolute path to the exported JSON file
+     * @return Circuit The newly created circuit with all relations loaded
+     *
+     * @throws \InvalidArgumentException If the file is missing or has an invalid format
+     * @throws Throwable
+     */
+    public static function importFromJson(string $path): Circuit
+    {
+        if (! file_exists($path)) {
+            throw new \InvalidArgumentException("File not found: {$path}");
+        }
+
+        $data = json_decode(file_get_contents($path), true);
+
+        if (! is_array($data) || ($data['_format'] ?? null) !== 'laravel-workflow/v1') {
+            throw new \InvalidArgumentException("Invalid workflow JSON format in: {$path}");
+        }
+
+        $circuit = DB::transaction(function () use ($data) {
+            $circuitData = $data['circuit'];
+
+            // Create circuit quietly to skip the "created" event that auto-creates a DRAFT basket
+            $circuit = new Circuit;
+            $circuit->forceFill([
+                'name' => $circuitData['name'],
+                'targetModel' => $circuitData['targetModel'],
+                'description' => $circuitData['description'] ?? null,
+                'roles' => $circuitData['roles'] ?? [],
+            ]);
+            $circuit->saveQuietly();
+
+            // Create baskets and build a ref map (old UUID → new UUID)
+            $refMap = [];
+            foreach ($data['baskets'] ?? [] as $basketData) {
+                $basket = $circuit->baskets()->create([
+                    'name' => $basketData['name'],
+                    'status' => $basketData['status'],
+                    'color' => $basketData['color'],
+                    'roles' => $basketData['roles'] ?? [],
+                ]);
+                $refMap[$basketData['_ref']] = $basket->id;
+            }
+
+            // Create transitions using the ref map
+            foreach ($data['baskets'] ?? [] as $basketData) {
+                $fromId = $refMap[$basketData['_ref']] ?? null;
+                if (! $fromId) {
+                    continue;
+                }
+
+                foreach ($basketData['transitions'] ?? [] as $trans) {
+                    $toId = $refMap[$trans['_to_ref']] ?? null;
+                    if (! $toId) {
+                        continue;
+                    }
+
+                    Basket::query()->find($fromId)->next()->attach($toId, [
+                        'label' => $trans['label'] ?? null,
+                        'actions' => json_encode($trans['actions'] ?? []),
+                    ]);
+                }
+            }
+
+            // Create messages
+            foreach ($data['messages'] ?? [] as $msgData) {
+                $circuit->messages()->create([
+                    'subject' => $msgData['subject'],
+                    'content' => $msgData['content'],
+                    'type' => $msgData['type'],
+                    'recipient' => $msgData['recipient'],
+                    'basket_id' => $refMap[$msgData['_basket_ref']] ?? null,
+                ]);
+            }
+
+            return $circuit;
+        });
+
+        return $circuit->load(['baskets.next', 'baskets.previous', 'baskets.messages', 'messages']);
+    }
 }

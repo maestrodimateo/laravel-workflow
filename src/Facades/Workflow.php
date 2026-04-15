@@ -35,6 +35,7 @@ use Maestrodimateo\Workflow\WorkflowManager;
  * @method static Collection circuitsForRoles(array $roles)
  * @method static void registerAction(string $actionClass)
  * @method static array getRegisteredActions()
+ * @method static Circuit importFromJson(string $path)
  *
  * @see WorkflowManager
  */

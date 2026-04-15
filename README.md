@@ -140,6 +140,16 @@ $wf = Workflow::for($model);
 | `requiredDocuments($basketId)` | `array` | Documents required for a transition |
 | `requirements()` | `array` | All requirements for all next transitions |
 
+### Static methods
+
+These methods don't require `for()`:
+
+| Method | Returns | Description |
+|---|---|---|
+| `importFromJson($path)` | `Circuit` | Import a circuit from an exported JSON file (for seeders/commands) |
+| `registerAction($class)` | `void` | Register a custom transition action |
+| `getRegisteredActions()` | `array` | List all registered action classes |
+
 ### Role-based queries
 
 These methods don't require `for()`:
@@ -416,6 +426,24 @@ vers {{ to_name }} par {{ user }} le {{ datetime }}.
 GET  /workflow/admin/api/circuits/{circuit}/export
 POST /workflow/admin/api/circuits/import  # multipart form, field: "file"
 ```
+
+### Programmatic import (seeders, commands)
+
+Import a previously exported JSON file directly from code — no HTTP request needed:
+
+```php
+use Maestrodimateo\Workflow\Facades\Workflow;
+
+// In a seeder
+Workflow::importFromJson(database_path('seeders/workflow-invoices.json'));
+
+// Or via the manager directly
+app(\Maestrodimateo\Workflow\WorkflowManager::class)::importFromJson($path);
+```
+
+The method creates the full circuit (baskets, transitions, messages) inside a database transaction and returns the newly created `Circuit` instance with all relations loaded.
+
+Throws `\InvalidArgumentException` if the file is missing or has an invalid format.
 
 ---
 

@@ -4,7 +4,6 @@ namespace Maestrodimateo\Workflow\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Maestrodimateo\Workflow\Enums\AllowedBasketColors;
 use Maestrodimateo\Workflow\Enums\MessageType;
@@ -119,71 +118,17 @@ class WorkflowAdminController extends Controller
             'file' => ['required', 'file', 'mimes:json,txt', 'max:2048'],
         ]);
 
-        $data = json_decode($request->file('file')->get(), true);
+        // Write uploaded file to a temp path so importFromJson can read it
+        $tempPath = tempnam(sys_get_temp_dir(), 'workflow_import_');
+        file_put_contents($tempPath, $request->file('file')->get());
 
-        if (! is_array($data) || ($data['_format'] ?? null) !== 'laravel-workflow/v1') {
-            return response()->json(['message' => 'Invalid file format.'], 422);
+        try {
+            $circuit = WorkflowManager::importFromJson($tempPath);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } finally {
+            @unlink($tempPath);
         }
-
-        $circuit = DB::transaction(function () use ($data) {
-            // Create circuit (without triggering the "created" event that auto-creates DRAFT)
-            $circuitData = $data['circuit'];
-            $circuit = new Circuit;
-            $circuit->forceFill([
-                'name' => $circuitData['name'].' (import)',
-                'targetModel' => $circuitData['targetModel'],
-                'description' => $circuitData['description'] ?? null,
-                'roles' => $circuitData['roles'] ?? [],
-            ]);
-            $circuit->saveQuietly();
-
-            // Create baskets — map old refs to new IDs
-            $refMap = [];
-            foreach ($data['baskets'] ?? [] as $basketData) {
-                $basket = $circuit->baskets()->create([
-                    'name' => $basketData['name'],
-                    'status' => $basketData['status'],
-                    'color' => $basketData['color'],
-                    'roles' => $basketData['roles'] ?? [],
-                ]);
-                $refMap[$basketData['_ref']] = $basket->id;
-            }
-
-            // Create transitions
-            foreach ($data['baskets'] ?? [] as $basketData) {
-                $fromId = $refMap[$basketData['_ref']] ?? null;
-                if (! $fromId) {
-                    continue;
-                }
-
-                foreach ($basketData['transitions'] ?? [] as $trans) {
-                    $toId = $refMap[$trans['_to_ref']] ?? null;
-                    if (! $toId) {
-                        continue;
-                    }
-
-                    Basket::query()->find($fromId)->next()->attach($toId, [
-                        'label' => $trans['label'] ?? null,
-                        'actions' => json_encode($trans['actions'] ?? []),
-                    ]);
-                }
-            }
-
-            // Create messages
-            foreach ($data['messages'] ?? [] as $msgData) {
-                $circuit->messages()->create([
-                    'subject' => $msgData['subject'],
-                    'content' => $msgData['content'],
-                    'type' => $msgData['type'],
-                    'recipient' => $msgData['recipient'],
-                    'basket_id' => $refMap[$msgData['_basket_ref']] ?? null,
-                ]);
-            }
-
-            return $circuit;
-        });
-
-        $circuit->load(['baskets.next', 'baskets.previous', 'baskets.messages', 'messages']);
 
         return response()->json($circuit, 201);
     }
