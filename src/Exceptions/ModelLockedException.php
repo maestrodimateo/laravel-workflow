@@ -12,7 +12,10 @@ class ModelLockedException extends RuntimeException
         public readonly WorkflowLock $lock,
     ) {
         parent::__construct(
-            "This model is locked by [{$lock->locked_by}] until [{$lock->expires_at->format('H:i')}]."
+            __('workflow::workflow.exceptions.model_locked', [
+                'user' => $lock->locked_by,
+                'time' => $lock->expires_at->format('H:i')
+            ])
         );
     }
 

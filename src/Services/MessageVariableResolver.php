@@ -63,17 +63,17 @@ class MessageVariableResolver
     public static function availableKeys(): array
     {
         $builtIn = [
-            'model_id' => 'Identifiant du modèle',
-            'model_type' => 'Type du modèle',
-            'from_status' => 'Statut de départ',
-            'from_name' => 'Nom du panier de départ',
-            'to_status' => "Statut d'arrivée",
-            'to_name' => "Nom du panier d'arrivée",
-            'circuit_name' => 'Nom du circuit',
-            'date' => 'Date du jour (JJ/MM/AAAA)',
-            'heure' => 'Heure (HH:MM)',
-            'datetime' => 'Date et heure',
-            'user' => 'Utilisateur qui effectue la transition',
+            'model_id' => __('workflow::workflow.variables.model_id'),
+            'model_type' => __('workflow::workflow.variables.model_type'),
+            'from_status' => __('workflow::workflow.variables.from_status'),
+            'from_name' => __('workflow::workflow.variables.from_name'),
+            'to_status' => __('workflow::workflow.variables.to_status'),
+            'to_name' => __('workflow::workflow.variables.to_name'),
+            'circuit_name' => __('workflow::workflow.variables.circuit_name'),
+            'date' => __('workflow::workflow.variables.date'),
+            'heure' => __('workflow::workflow.variables.heure'),
+            'datetime' => __('workflow::workflow.variables.datetime'),
+            'user' => __('workflow::workflow.variables.user'),
         ];
 
         $custom = [];

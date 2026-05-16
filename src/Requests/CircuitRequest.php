@@ -21,9 +21,7 @@ class CircuitRequest extends FormRequest
         return [
             /** Le nom du circuit */
             'name' => ['required', 'string', Rule::unique('circuits')->ignore($this->circuit)],
-            /** Le modèle du circuit avec namespace */
-            'targetModel' => ['required', fn ($attribute, $value, $fail) => ! class_exists($value) ? $fail($attribute.' doit être un modèle') : null],
-            /** La description du circuit */
+            'targetModel' => ['required', fn ($attribute, $value, $fail) => ! class_exists($value) ? $fail($attribute.' must be a valid model class') : null],
             'description' => ['nullable', 'string'],
             /** Les rôles autorisés pour ce circuit */
             'roles' => ['nullable', 'array'],
@@ -38,9 +36,9 @@ class CircuitRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required' => 'Le nom est obligatoire',
-            'targetModel.required' => 'Le modèle est obligatoire',
-            'name.unique' => 'Ce nom est déjà utilisé',
+            'name.required' => __('workflow::workflow.validation.circuit_name_required'),
+            'targetModel.required' => __('workflow::workflow.validation.circuit_target_required'),
+            'name.unique' => __('workflow::workflow.validation.circuit_name_unique'),
         ];
     }
 

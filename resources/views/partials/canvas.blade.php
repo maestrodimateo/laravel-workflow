@@ -19,8 +19,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-2.25-2.25v-2.25z"/>
             </svg>
         </div>
-        <p class="text-muted-foreground text-sm mb-4">Sélectionnez ou créez un circuit</p>
-        <button @click="openCircuitModal()" class="sh-btn sh-btn-primary h-9 text-sm">Créer un circuit</button>
+        <p class="text-muted-foreground text-sm mb-4">{{ __('workflow::workflow.ui.canvas.empty_message') }}</p>
+        <button @click="openCircuitModal()" class="sh-btn sh-btn-primary h-9 text-sm">{{ __('workflow::workflow.ui.canvas.empty_button') }}</button>
     </div>
 
     {{-- Zoom wrapper --}}

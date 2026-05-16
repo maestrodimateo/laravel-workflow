@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr" class="h-full" :class="{'dark': dark}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full" :class="{'dark': dark}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Workflow Designer</title>
+    <title>{{ __('workflow::workflow.ui.header.title') }}</title>
 
     {{-- Dependencies --}}
     <script src="https://cdn.tailwindcss.com"></script>
@@ -510,7 +510,7 @@
 
                     const firstError = errorData.message
                         || Object.values(errorData.errors || {}).flat()[0]
-                        || 'Erreur serveur';
+                        || this.t('notifications.server_error');
 
                     throw new Error(firstError);
                 }
@@ -534,7 +534,7 @@
 
                     const editor = new Quill(container, {
                         theme: 'snow',
-                        placeholder: 'Rédigez le contenu du message...',
+                        placeholder: this.t('ui.message_modal.content_placeholder'),
                         modules: {
                             toolbar: [
                                 [{ header: [1, 2, 3, false] }],
@@ -872,7 +872,7 @@
                 // Prevent duplicate links
                 const alreadyLinked = (this.linkSource.next || []).some(n => n.id === targetBasket.id);
                 if (alreadyLinked) {
-                    this.showToast('Lien déjà existant', false);
+                    this.showToast(this.t('notifications.link_exists'), false);
                     this.linkSource = null;
                     this.drawEdges();
                     return;
@@ -919,7 +919,7 @@
                     this.linkSource = null;
                     await this.refreshBaskets();
                     this.selectedBasket = this.baskets.find(b => b.id === sourceId) || null;
-                    this.showToast('Transition créée');
+                    this.showToast(this.t('notifications.transition_created'));
                 } catch (error) {
                     this.showToast(error.message, false);
                     this.linkSource = null;
@@ -950,7 +950,7 @@
                     });
                     await this.refreshBaskets();
                     this.selectedBasket = this.baskets.find(b => b.id === fromBasket.id) || null;
-                    this.showToast('Transition supprimée');
+                    this.showToast(this.t('notifications.transition_deleted'));
                 } catch (error) {
                     this.showToast(error.message, false);
                 }
@@ -1322,7 +1322,7 @@
                             Object.assign(this.circuits[index], this.circuitForm);
                             this.circuit = { ...this.circuits[index] };
                         }
-                        this.showToast('Circuit mis à jour');
+                        this.showToast(this.t('notifications.circuit_updated'));
                     } else {
                         const response = await this.api('POST', '/circuits', this.circuitForm);
                         const created = response.circuit?.data || response.circuit || response.data || response;
@@ -1335,7 +1335,7 @@
 
                         this.circuits.push(circuit);
                         this.selectCircuit(circuit);
-                        this.showToast('Circuit créé');
+                        this.showToast(this.t('notifications.circuit_created'));
                     }
                     this.activeModal = null;
                 } catch (error) {
@@ -1345,14 +1345,14 @@
             },
 
             async deleteCircuit() {
-                if (!confirm('Supprimer ce circuit ?')) return;
+                if (!confirm(this.t('notifications.confirm_delete_circuit'))) return;
                 try {
                     await this.api('DELETE', '/circuits/' + this.circuit.id);
                     this.circuits = this.circuits.filter(c => c.id !== this.circuit.id);
                     this.circuit = this.circuits[0] || null;
                     this.selectedBasket = null;
                     this.nodePositions = {};
-                    this.showToast('Supprimé');
+                    this.showToast(this.t('notifications.circuit_deleted'));
                 } catch (error) {
                     this.showToast(error.message, false);
                 }
@@ -1375,7 +1375,7 @@
                     link.click();
                     document.body.removeChild(link);
                     URL.revokeObjectURL(url);
-                    this.showToast('Circuit exporté');
+                    this.showToast(this.t('notifications.circuit_exported'));
                 } catch (error) {
                     this.showToast(error.message, false);
                 }
@@ -1398,7 +1398,7 @@
 
                     if (!response.ok) {
                         const error = await response.json().catch(() => ({}));
-                        throw new Error(error.message || 'Erreur import');
+                        throw new Error(error.message || this.t('notifications.server_error'));
                     }
 
                     const circuit = await response.json();
@@ -1406,7 +1406,7 @@
                     circuit.messages = circuit.messages || [];
                     this.circuits.push(circuit);
                     this.selectCircuit(circuit);
-                    this.showToast('Circuit importé');
+                    this.showToast(this.t('notifications.circuit_imported'));
                 } catch (error) {
                     this.showToast(error.message, false);
                 }
@@ -1453,10 +1453,10 @@
 
                     if (this.editingId) {
                         await this.api('PUT', '/baskets/' + this.editingId, payload);
-                        this.showToast('Panier mis à jour');
+                        this.showToast(this.t('notifications.basket_updated'));
                     } else {
                         await this.api('POST', '/baskets', payload);
-                        this.showToast('Panier créé');
+                        this.showToast(this.t('notifications.basket_created'));
                     }
 
                     await this.refreshBaskets();
@@ -1469,13 +1469,13 @@
             },
 
             async deleteBasket(basket) {
-                if (!confirm('Supprimer "' + basket.name + '" ?')) return;
+                if (!confirm(this.t('notifications.confirm_delete_basket') + ' "' + basket.name + '" ?')) return;
                 try {
                     await this.api('DELETE', '/baskets/' + basket.id);
                     delete this.nodePositions[basket.id];
                     await this.refreshBaskets();
                     if (this.selectedBasket?.id === basket.id) this.selectedBasket = null;
-                    this.showToast('Supprimé');
+                    this.showToast(this.t('notifications.basket_deleted'));
                 } catch (error) {
                     this.showToast(error.message, false);
                 }
@@ -1499,7 +1499,7 @@
             async saveMsg() {
                 const isEmpty = !this.messageForm.content || this.messageForm.content === '<p><br></p>';
                 if (isEmpty) {
-                    this.showToast('Le contenu est obligatoire', false);
+                    this.showToast(this.t('notifications.content_required'), false);
                     return;
                 }
 
@@ -1508,7 +1508,7 @@
                     await this.api('POST', '/circuits/' + this.circuit.id + '/messages', this.messageForm);
                     await this.refreshMessages();
                     this.activeModal = null;
-                    this.showToast('Message créé');
+                    this.showToast(this.t('notifications.message_created'));
                 } catch (error) {
                     this.showToast(error.message, false);
                 }
@@ -1516,11 +1516,11 @@
             },
 
             async deleteMsg(message) {
-                if (!confirm('Supprimer ?')) return;
+                if (!confirm(this.t('notifications.confirm_delete_message'))) return;
                 try {
                     await this.api('DELETE', '/circuits/' + this.circuit.id + '/messages/' + message.id);
                     await this.refreshMessages();
-                    this.showToast('Supprimé');
+                    this.showToast(this.t('notifications.message_deleted'));
                 } catch (error) {
                     this.showToast(error.message, false);
                 }
@@ -1582,11 +1582,43 @@
                     if (this.selectedBasket) {
                         this.selectedBasket = this.baskets.find(b => b.id === this.selectedBasket.id) || null;
                     }
-                    this.showToast('Transition configurée');
+                    this.showToast(this.t('notifications.transition_configured'));
                 } catch (error) {
                     this.showToast(error.message, false);
                 }
                 this.isLoading = false;
+            },
+
+            t(key, replace = {}) {
+                const translations = {
+                    'notifications.link_exists': '{{ __("workflow::workflow.notifications.link_exists") }}',
+                    'notifications.transition_created': '{{ __("workflow::workflow.notifications.transition_created") }}',
+                    'notifications.transition_deleted': '{{ __("workflow::workflow.notifications.transition_deleted") }}',
+                    'notifications.transition_configured': '{{ __("workflow::workflow.notifications.transition_configured") }}',
+                    'notifications.circuit_updated': '{{ __("workflow::workflow.notifications.circuit_updated") }}',
+                    'notifications.circuit_created': '{{ __("workflow::workflow.notifications.circuit_created") }}',
+                    'notifications.circuit_deleted': '{{ __("workflow::workflow.notifications.circuit_deleted") }}',
+                    'notifications.circuit_exported': '{{ __("workflow::workflow.notifications.circuit_exported") }}',
+                    'notifications.circuit_imported': '{{ __("workflow::workflow.notifications.circuit_imported") }}',
+                    'notifications.basket_updated': '{{ __("workflow::workflow.notifications.basket_updated") }}',
+                    'notifications.basket_created': '{{ __("workflow::workflow.notifications.basket_created") }}',
+                    'notifications.basket_deleted': '{{ __("workflow::workflow.notifications.basket_deleted") }}',
+                    'notifications.message_created': '{{ __("workflow::workflow.notifications.message_created") }}',
+                    'notifications.message_deleted': '{{ __("workflow::workflow.notifications.message_deleted") }}',
+                    'notifications.content_required': '{{ __("workflow::workflow.notifications.content_required") }}',
+                    'notifications.confirm_delete_circuit': '{{ __("workflow::workflow.notifications.confirm_delete_circuit") }}',
+                    'notifications.confirm_delete_basket': '{{ __("workflow::workflow.notifications.confirm_delete_basket") }}',
+                    'notifications.confirm_delete_message': '{{ __("workflow::workflow.notifications.confirm_delete_message") }}',
+                    'notifications.server_error': '{{ __("workflow::workflow.notifications.server_error") }}',
+                    'ui.message_modal.content_placeholder': '{{ __("workflow::workflow.ui.message_modal.content_placeholder") }}',
+                };
+                
+                let text = translations[key] || key;
+                
+                for (const [k, v] of Object.entries(replace)) {
+                    text = text.replace(`:${k}`, v);
+                }
+                return text;
             },
 
         };
