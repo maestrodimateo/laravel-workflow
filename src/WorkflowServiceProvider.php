@@ -25,6 +25,7 @@ class WorkflowServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'workflow');
+        $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'workflow');
         $this->loadRoutes();
         $this->registerBuiltInActions();
 
@@ -42,6 +43,10 @@ class WorkflowServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../resources/views' => resource_path('views/vendor/workflow'),
             ], 'workflow-views');
+
+            $this->publishes([
+                __DIR__.'/../resources/lang' => $this->app->langPath('vendor/workflow'),
+            ], 'workflow-lang');
         }
     }
 

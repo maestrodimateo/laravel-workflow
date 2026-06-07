@@ -42,7 +42,7 @@
                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8"/></svg>
                 <span x-text="(b.messages || []).length"></span>
             </span>
-            <span x-show="!(b.next || []).length && b.status !== 'DRAFT'" class="text-green-600 dark:text-green-400 font-semibold">FIN</span>
+            <span x-show="!(b.next || []).length && b.status !== 'DRAFT'" class="text-green-600 dark:text-green-400 font-semibold">{{ __('workflow::workflow.ui.canvas.fin') }}</span>
         </div>
     </div>
 

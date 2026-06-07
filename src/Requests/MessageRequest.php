@@ -44,15 +44,15 @@ class MessageRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'type.required' => 'Le type de message est obligatoire',
-            'type.in' => 'Le type de message est invalide',
-            'content.required' => 'Le contenu du message est obligatoire',
-            'subject.required' => 'L\'objet du message est obligatoire',
-            'recipient.required' => 'Le destinataire du message est obligatoire',
-            'recipient.in' => 'Le destinataire du message est invalide',
-            'circuit_id.required' => 'L\'identifiant du circuit est obligatoire',
-            'circuit_id.uuid' => 'L\'identifiant du circuit est invalide',
-            'circuit_id.exists' => 'Le circuit n\'existe pas',
+            'type.required' => __('workflow::workflow.validation.message_type_required'),
+            'type.in' => __('workflow::workflow.validation.message_type_invalid'),
+            'content.required' => __('workflow::workflow.validation.message_content_required'),
+            'subject.required' => __('workflow::workflow.validation.message_subject_required'),
+            'recipient.required' => __('workflow::workflow.validation.message_recipient_required'),
+            'recipient.in' => __('workflow::workflow.validation.message_recipient_invalid'),
+            'circuit_id.required' => __('workflow::workflow.validation.circuit_uuid_required'),
+            'circuit_id.uuid' => __('workflow::workflow.validation.circuit_uuid_invalid'),
+            'circuit_id.exists' => __('workflow::workflow.validation.circuit_exists'),
         ];
     }
 

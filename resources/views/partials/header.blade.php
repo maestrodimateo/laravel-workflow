@@ -9,7 +9,7 @@
             <svg class="w-5 h-5 text-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25a2.25 2.25 0 01-2.25-2.25v-2.25z"/>
             </svg>
-            <span class="font-semibold text-sm text-foreground tracking-tight">Workflow Designer</span>
+            <span class="font-semibold text-sm text-foreground tracking-tight">{{ __('workflow::workflow.ui.header.title') }}</span>
         </div>
 
         <div class="h-4 w-px bg-border mx-1"></div>
@@ -17,7 +17,7 @@
         {{-- Circuit dropdown --}}
         <div class="relative" x-data="{open:false}">
             <button @click="open=!open" class="sh-btn sh-btn-outline text-xs h-8 max-w-[320px]">
-                <span x-text="circuit ? circuit.name : 'Choisir un circuit'" class="truncate"></span>
+                <span x-text="circuit ? circuit.name : '{{ __('workflow::workflow.ui.header.select_circuit') }}'" class="truncate"></span>
                 <svg class="w-3.5 h-3.5 text-muted-foreground shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
@@ -35,12 +35,12 @@
                     <button @click="openCircuitModal();open=false"
                             class="w-full text-left px-3 py-2 text-sm hover:bg-accent font-medium flex items-center gap-2 text-card-foreground">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        Nouveau circuit
+                        {{ __('workflow::workflow.ui.header.new_circuit') }}
                     </button>
                     <button @click="$refs.importInput.click();open=false"
                             class="w-full text-left px-3 py-2 text-sm hover:bg-accent font-medium flex items-center gap-2 text-muted-foreground">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                        Importer
+                        {{ __('workflow::workflow.ui.header.import') }}
                     </button>
                 </div>
             </div>

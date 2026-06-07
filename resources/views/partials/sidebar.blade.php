@@ -20,23 +20,23 @@
             {{-- Info --}}
             <div class="px-4 py-3 space-y-3 text-sm">
                 <div>
-                    <label class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Statut</label>
+                    <label class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{{ __('workflow::workflow.ui.sidebar.status') }}</label>
                     <p class="font-mono text-foreground text-xs mt-0.5" x-text="sel.status"></p>
                 </div>
                 <div>
-                    <label class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Rôles</label>
+                    <label class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{{ __('workflow::workflow.ui.sidebar.roles') }}</label>
                     <div class="flex flex-wrap gap-1 mt-1" x-show="(sel.roles || []).length">
                         <template x-for="r in (sel.roles || [])" :key="r">
                             <span class="sh-badge text-[10px]" x-text="r"></span>
                         </template>
                     </div>
-                    <p x-show="!(sel.roles || []).length" class="text-muted-foreground text-xs mt-0.5">Aucun</p>
+                    <p x-show="!(sel.roles || []).length" class="text-muted-foreground text-xs mt-0.5">{{ __('workflow::workflow.ui.sidebar.none') }}</p>
                 </div>
             </div>
 
             {{-- Transitions --}}
             <div class="px-4 py-3 border-t border-border">
-                <h4 class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Transitions</h4>
+                <h4 class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">{{ __('workflow::workflow.ui.sidebar.transitions') }}</h4>
 
                 <div class="space-y-1.5" x-show="(sel.next || []).length">
                     <template x-for="n in (sel.next || [])" :key="n.id">
@@ -61,16 +61,16 @@
                     </template>
                 </div>
 
-                <p x-show="!(sel.next || []).length" class="text-xs text-muted-foreground">Aucune — étape finale</p>
+                <p x-show="!(sel.next || []).length" class="text-xs text-muted-foreground">{{ __('workflow::workflow.ui.sidebar.final_step') }}</p>
 
                 <div class="mt-2 flex gap-1.5" x-show="availTargets.length">
                     <select x-model="linkTarget" class="sh-input flex-1 h-7 text-xs">
-                        <option value="">Ajouter...</option>
+                        <option value="">{{ __('workflow::workflow.ui.sidebar.add_transition_placeholder') }}</option>
                         <template x-for="t in availTargets" :key="t.id">
                             <option :value="t.id" x-text="t.name"></option>
                         </template>
                     </select>
-                    <button x-show="linkTarget" @click="addLink()" class="sh-btn sh-btn-primary h-7 text-xs px-2">OK</button>
+                    <button x-show="linkTarget" @click="addLink()" class="sh-btn sh-btn-primary h-7 text-xs px-2">{{ __('workflow::workflow.ui.sidebar.add') }}</button>
                 </div>
             </div>
 

@@ -49,17 +49,17 @@ class BasketRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'color.required' => 'La couleur du panier est obligatoire',
-            'color.regex' => 'La couleur doit être un code hexadécimal valide (ex: #2563eb)',
-            'name.required' => 'Le nom du panier est obligatoire',
-            'name.unique' => 'Le nom du panier est déjà utilisé',
-            'status.required' => 'Le statut du panier est obligatoire',
-            'circuit_id.required' => 'Le circuit est obligatoire',
-            'circuit_id.exists' => 'Ce circuit est invalide',
-            'roles.array' => 'Renseignez une liste de rôles',
-            'roles.*.exists' => 'Un des rôles est invalide',
-            'previous.array' => 'Renseignez une liste de paniers précédents',
-            'previous.*.exists' => 'Un des paniers précédents est invalide',
+            'color.required' => __('workflow::workflow.validation.color_required'),
+            'color.regex' => __('workflow::workflow.validation.color_regex'),
+            'name.required' => __('workflow::workflow.validation.name_required'),
+            'name.unique' => __('workflow::workflow.validation.name_unique'),
+            'status.required' => __('workflow::workflow.validation.status_required'),
+            'circuit_id.required' => __('workflow::workflow.validation.circuit_id_required'),
+            'circuit_id.exists' => __('workflow::workflow.validation.circuit_id_exists'),
+            'roles.array' => __('workflow::workflow.validation.roles_array'),
+            'roles.*.exists' => __('workflow::workflow.validation.role_invalid'),
+            'previous.array' => __('workflow::workflow.validation.previous_array'),
+            'previous.*.exists' => __('workflow::workflow.validation.previous_invalid'),
         ];
     }
 
