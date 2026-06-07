@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Events\TransitionEvent;
 use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
@@ -291,6 +292,14 @@ class WorkflowManager
         return ['transitioned' => count($eligibleIds), 'skipped' => $skipped];
     }
 
+    /**
+     * Execute the actions configured on the transition between two baskets.
+     *
+     * Actions implementing {@see AfterCommitAction} are deferred via
+     * `DB::afterCommit()` so their side effects only fire once the surrounding
+     * transaction is committed. All other actions run synchronously inside
+     * the current transaction, so a thrown exception rolls back the transition.
+     */
     protected function executeTransitionActions(Basket $from, Basket $to): void
     {
         $actions = $this->decodeTransitionActions($from, $to);
@@ -299,8 +308,17 @@ class WorkflowManager
             $key = $actionConfig['type'] ?? null;
             $config = $actionConfig['config'] ?? [];
 
-            if ($key && isset(static::$actions[$key])) {
-                (new static::$actions[$key])->execute($this->subject, $from, $to, $config);
+            if (! $key || ! isset(static::$actions[$key])) {
+                continue;
+            }
+
+            $action = new static::$actions[$key];
+            $subject = $this->subject;
+
+            if ($action instanceof AfterCommitAction) {
+                DB::afterCommit(fn () => $action->execute($subject, $from, $to, $config));
+            } else {
+                $action->execute($subject, $from, $to, $config);
             }
         }
     }

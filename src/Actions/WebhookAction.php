@@ -5,10 +5,11 @@ namespace Maestrodimateo\Workflow\Actions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Models\Basket;
 
-class WebhookAction implements TransitionAction
+class WebhookAction implements TransitionAction, AfterCommitAction
 {
     public static function key(): string
     {

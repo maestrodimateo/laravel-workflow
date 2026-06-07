@@ -298,12 +298,21 @@ Actions are executed automatically when a specific transition occurs. They are *
 
 ### Built-in actions
 
-| Action | Key | Config |
-|---|---|---|
-| Send email | `send_email` | Select a message from the circuit |
-| Log | `log` | Optional message |
-| Webhook | `webhook` | URL to POST to |
-| Require documents | `require_document` | List of documents (type + label) |
+| Action | Key | Config | Runs |
+|---|---|---|---|
+| Send email | `send_email` | Select a message from the circuit | After commit |
+| Log | `log` | Optional message | After commit |
+| Webhook | `webhook` | URL to POST to | After commit |
+| Require documents | `require_document` | List of documents (type + label) | In transaction |
+
+### Transaction behavior
+
+Every `transition()` is wrapped in a single DB transaction (model move, history insert, lock release). Each action runs in one of two modes depending on whether it implements the `AfterCommitAction` marker interface:
+
+- **In transaction (default)** — the action runs inside the transition transaction. A thrown exception rolls back the entire transition. Use this for validations (e.g., `require_document`) or DB writes that must be atomic with the transition.
+- **After commit** — the action runs only once the transition has been committed to the database. Use this for non-rollbackable side effects (sending emails, calling webhooks, writing logs, external API calls) so an in-flight failure can't leave the system in a state where the side effect fired but the DB rolled back.
+
+`SendEmailAction`, `WebhookAction`, and `LogTransitionAction` implement `AfterCommitAction`. `RequireDocumentAction` does not — its throw must be able to abort the transition.
 
 ### Custom actions
 
@@ -338,6 +347,31 @@ Workflow::registerAction(GeneratePdfAction::class);
 
 The action immediately appears in the admin UI's "Add action" menu on any transition.
 
+### Opting an action out of the transaction
+
+If your custom action produces an external side effect that cannot be rolled back (HTTP call, email, push notification, third-party SDK), add the `AfterCommitAction` marker so it only runs once the transition is safely committed:
+
+```php
+use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
+use Maestrodimateo\Workflow\Contracts\TransitionAction;
+
+class NotifySlackAction implements TransitionAction, AfterCommitAction
+{
+    public static function key(): string { return 'notify_slack'; }
+    public static function label(): string { return 'Notify Slack'; }
+
+    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    {
+        Http::post($config['webhook_url'], [
+            'model' => $model->getKey(),
+            'to'    => $to->status,
+        ]);
+    }
+}
+```
+
+Validation-style actions (those that may throw to abort the transition) should NOT implement `AfterCommitAction` — their exception needs to roll back the transition, which is only possible from inside the transaction.
+
 ---
 
 ## Events
@@ -368,11 +402,14 @@ public function handle(TransitionEvent $event): void
 
 ```
 1. Lock guard — throws ModelLockedException if locked by another user
-2. Model detached from current basket, attached to next
-3. Transition actions executed (configured visually on the link)
-4. TransitionEvent fired → HistoryListener records history with duration
-5. Lock released automatically
-6. Your custom listeners run
+2. DB transaction opens
+   a. Model detached from current basket, attached to next
+   b. In-transaction actions executed (e.g. require_document — may throw and rollback)
+   c. TransitionEvent fired → HistoryListener records history with duration
+   d. Lock released
+3. DB transaction commits
+4. After-commit actions executed (send_email, webhook, log, any AfterCommitAction)
+5. Your custom listeners run
 ```
 
 ---

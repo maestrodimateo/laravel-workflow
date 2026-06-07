@@ -4,10 +4,11 @@ namespace Maestrodimateo\Workflow\Actions;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
+use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Models\Basket;
 
-class LogTransitionAction implements TransitionAction
+class LogTransitionAction implements TransitionAction, AfterCommitAction
 {
     public static function key(): string
     {

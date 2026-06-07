@@ -4,12 +4,13 @@ namespace Maestrodimateo\Workflow\Actions;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Mail;
+use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Emails\TransitionMail;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Message;
 
-class SendEmailAction implements TransitionAction
+class SendEmailAction implements TransitionAction, AfterCommitAction
 {
     public static function key(): string
     {
