@@ -37,7 +37,8 @@ return [
     |     'reference'     => fn ($model) => $model->reference,
     | ],
     */
-    'message_variables' => [],
+    'message_variables' => [
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -53,6 +54,24 @@ return [
     | ],
     */
     'actions' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queued Actions
+    |--------------------------------------------------------------------------
+    | Default queue and connection used when an action implements
+    | QueueableAction without overriding queue() / connection() itself.
+    | Leave null to fall back to Laravel's default queue/connection
+    | (driven by QUEUE_CONNECTION).
+    |
+    | Setting `connection` to "sync" forces queueable actions to run
+    | inline on the request — useful for local development without a
+    | running worker.
+    */
+    'actions_queue' => [
+        'queue' => env('WORKFLOW_ACTIONS_QUEUE'),
+        'connection' => env('WORKFLOW_ACTIONS_QUEUE_CONNECTION'),
+    ],
 
     /*
     |--------------------------------------------------------------------------

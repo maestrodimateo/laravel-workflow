@@ -8,9 +8,11 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
+use Maestrodimateo\Workflow\Contracts\QueueableAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Events\TransitionEvent;
 use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
+use Maestrodimateo\Workflow\Jobs\ExecuteTransitionActionJob;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Circuit;
 use Maestrodimateo\Workflow\Models\WorkflowLock;
@@ -295,10 +297,14 @@ class WorkflowManager
     /**
      * Execute the actions configured on the transition between two baskets.
      *
-     * Actions implementing {@see AfterCommitAction} are deferred via
-     * `DB::afterCommit()` so their side effects only fire once the surrounding
-     * transaction is committed. All other actions run synchronously inside
-     * the current transaction, so a thrown exception rolls back the transition.
+     * Three execution paths exist:
+     *   - {@see QueueableAction}: dispatched as an {@see ExecuteTransitionActionJob}
+     *     on a worker, deferred via `DB::afterCommit()` so the worker never picks
+     *     it up before the row state is visible.
+     *   - {@see AfterCommitAction}: invoked inline after the transaction commits
+     *     (still in the request lifecycle, but past rollback risk).
+     *   - All other actions: invoked synchronously inside the current
+     *     transaction, so a thrown exception rolls the transition back.
      */
     protected function executeTransitionActions(Basket $from, Basket $to): void
     {
@@ -312,10 +318,26 @@ class WorkflowManager
                 continue;
             }
 
-            $action = new static::$actions[$key];
+            $actionClass = static::$actions[$key];
+            $action = new $actionClass;
             $subject = $this->subject;
 
-            if ($action instanceof AfterCommitAction) {
+            if ($action instanceof QueueableAction) {
+                $queue = $actionClass::queue() ?? config('workflow.actions_queue.queue');
+                $connection = $actionClass::connection() ?? config('workflow.actions_queue.connection');
+
+                DB::afterCommit(function () use ($actionClass, $subject, $from, $to, $config, $queue, $connection) {
+                    $job = ExecuteTransitionActionJob::dispatch($actionClass, $subject, $from, $to, $config);
+
+                    if ($queue !== null) {
+                        $job->onQueue($queue);
+                    }
+
+                    if ($connection !== null) {
+                        $job->onConnection($connection);
+                    }
+                });
+            } elseif ($action instanceof AfterCommitAction) {
                 DB::afterCommit(fn () => $action->execute($subject, $from, $to, $config));
             } else {
                 $action->execute($subject, $from, $to, $config);

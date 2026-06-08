@@ -300,19 +300,20 @@ Actions are executed automatically when a specific transition occurs. They are *
 
 | Action | Key | Config | Runs |
 |---|---|---|---|
-| Send email | `send_email` | Select a message from the circuit | After commit |
+| Send email | `send_email` | Select a message from the circuit | Queue (after commit) |
+| Webhook | `webhook` | URL to POST to | Queue (after commit) |
 | Log | `log` | Optional message | After commit |
-| Webhook | `webhook` | URL to POST to | After commit |
 | Require documents | `require_document` | List of documents (type + label) | In transaction |
 
 ### Transaction behavior
 
-Every `transition()` is wrapped in a single DB transaction (model move, history insert, lock release). Each action runs in one of two modes depending on whether it implements the `AfterCommitAction` marker interface:
+Every `transition()` is wrapped in a single DB transaction (model move, history insert, lock release). Each action runs in one of three modes depending on which marker interface it implements:
 
 - **In transaction (default)** — the action runs inside the transition transaction. A thrown exception rolls back the entire transition. Use this for validations (e.g., `require_document`) or DB writes that must be atomic with the transition.
-- **After commit** — the action runs only once the transition has been committed to the database. Use this for non-rollbackable side effects (sending emails, calling webhooks, writing logs, external API calls) so an in-flight failure can't leave the system in a state where the side effect fired but the DB rolled back.
+- **After commit** (`AfterCommitAction`) — the action runs inline once the transition has been committed to the database. Use this for fast non-rollbackable side effects (logging, in-memory cache invalidation) where queueing would be overkill.
+- **Queued** (`QueueableAction`) — the action is wrapped in a job and dispatched after commit, executed by a queue worker. Use this for slow or external side effects (HTTP calls, email, third-party APIs) so the request returns immediately and transient failures can be retried by the worker.
 
-`SendEmailAction`, `WebhookAction`, and `LogTransitionAction` implement `AfterCommitAction`. `RequireDocumentAction` does not — its throw must be able to abort the transition.
+`SendEmailAction` and `WebhookAction` implement `QueueableAction`. `LogTransitionAction` implements `AfterCommitAction`. `RequireDocumentAction` runs inline — its throw must be able to abort the transition.
 
 ### Custom actions
 
@@ -372,6 +373,53 @@ class NotifySlackAction implements TransitionAction, AfterCommitAction
 
 Validation-style actions (those that may throw to abort the transition) should NOT implement `AfterCommitAction` — their exception needs to roll back the transition, which is only possible from inside the transaction.
 
+### Running an action on a queue
+
+For slow side effects (HTTP calls, email, third-party APIs), implement `QueueableAction` instead. The action is wrapped in a job and dispatched after commit, so the request returns immediately and the worker picks it up:
+
+```php
+use Maestrodimateo\Workflow\Contracts\QueueableAction;
+use Maestrodimateo\Workflow\Contracts\TransitionAction;
+
+class NotifySlackAction implements TransitionAction, QueueableAction
+{
+    public static function key(): string { return 'notify_slack'; }
+    public static function label(): string { return 'Notify Slack'; }
+
+    // Return null to use the package default (workflow.actions_queue.queue),
+    // then Laravel's default queue.
+    public static function queue(): ?string { return 'notifications'; }
+
+    // Same fallback chain for the queue connection.
+    public static function connection(): ?string { return null; }
+
+    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    {
+        Http::post($config['webhook_url'], [
+            'model' => $model->getKey(),
+            'to'    => $to->status,
+        ]);
+    }
+}
+```
+
+What you get for free:
+
+- **Race-free dispatch** — the job is sent inside `DB::afterCommit()`, so the worker can never read the transition's rows before they're visible.
+- **Fresh state on the worker** — the subject, source and target baskets are serialized by reference (`SerializesModels`) and re-fetched from the DB when the job runs.
+- **Automatic retries** — Laravel's queue worker handles retries, backoff, and failed-jobs storage like any other job.
+
+Override the queue and connection globally via `.env`:
+
+```env
+WORKFLOW_ACTIONS_QUEUE=workflow
+WORKFLOW_ACTIONS_QUEUE_CONNECTION=redis
+```
+
+With `QUEUE_CONNECTION=sync` (the Laravel default), queueable actions run inline on the request — useful for local development without a running worker. Switching to `redis`, `database`, or `sqs` is enough to move them off the request lifecycle; no code change required.
+
+> A `QueueableAction` already runs after commit — you don't need to also implement `AfterCommitAction`.
+
 ---
 
 ## Events
@@ -408,8 +456,9 @@ public function handle(TransitionEvent $event): void
    c. TransitionEvent fired → HistoryListener records history with duration
    d. Lock released
 3. DB transaction commits
-4. After-commit actions executed (send_email, webhook, log, any AfterCommitAction)
-5. Your custom listeners run
+4. After-commit actions executed inline (log, any AfterCommitAction)
+5. Queueable actions dispatched to the queue (send_email, webhook, any QueueableAction)
+6. Your custom listeners run
 ```
 
 ---
@@ -496,6 +545,11 @@ return [
     ],
     'auth_identifier' => 'id',
     'message_variables' => [],
+    'actions' => [],
+    'actions_queue' => [
+        'queue' => env('WORKFLOW_ACTIONS_QUEUE'),           // null → Laravel's default queue
+        'connection' => env('WORKFLOW_ACTIONS_QUEUE_CONNECTION'), // null → Laravel's default connection
+    ],
     'lock' => [
         'duration_minutes' => 30,
     ],

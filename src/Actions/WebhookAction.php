@@ -5,11 +5,11 @@ namespace Maestrodimateo\Workflow\Actions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
-use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
+use Maestrodimateo\Workflow\Contracts\QueueableAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Models\Basket;
 
-class WebhookAction implements TransitionAction, AfterCommitAction
+class WebhookAction implements TransitionAction, QueueableAction
 {
     public static function key(): string
     {
@@ -19,6 +19,16 @@ class WebhookAction implements TransitionAction, AfterCommitAction
     public static function label(): string
     {
         return 'Call webhook';
+    }
+
+    public static function queue(): ?string
+    {
+        return null;
+    }
+
+    public static function connection(): ?string
+    {
+        return null;
     }
 
     /**
