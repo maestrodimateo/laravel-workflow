@@ -24,7 +24,7 @@ Route::name('workflow.')->group(function (): void {
     });
 
     // Messages
-    Route::prefix('circuits/{circuit}/messages')->name('messages.')->group(function (): void {
+    Route::prefix('circuits/{circuit}/messages')->name('messages.')->scopeBindings()->group(function (): void {
         Route::post('/', [MessageController::class, 'store'])->name('store');
         Route::put('/{message}', [MessageController::class, 'update'])->name('update');
         Route::delete('/{message}', [MessageController::class, 'destroy'])->name('destroy');

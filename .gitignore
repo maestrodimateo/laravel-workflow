@@ -1,3 +1,5 @@
 /vendor/
 /composer.lock
 /.phpunit.cache
+ARCHITECTURE.md
+.DS_Store

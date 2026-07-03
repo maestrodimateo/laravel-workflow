@@ -2,7 +2,6 @@
 
 namespace Maestrodimateo\Workflow\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Maestrodimateo\Workflow\Enums\MessageType;
 use Maestrodimateo\Workflow\Enums\RecipientType;
@@ -16,7 +15,7 @@ use Maestrodimateo\Workflow\Enums\RecipientType;
  * @property string $recipient
  * @property string $circuit_id
  */
-class MessageRequest extends FormRequest
+class MessageRequest extends WorkflowFormRequest
 {
     /**
      * Get the validation rules that apply to the request.
@@ -54,13 +53,5 @@ class MessageRequest extends FormRequest
             'circuit_id.uuid' => __('workflow::workflow.validation.circuit_uuid_invalid'),
             'circuit_id.exists' => __('workflow::workflow.validation.circuit_exists'),
         ];
-    }
-
-    /**
-     * Determine if the user is authorized to make this request.
-     */
-    public function authorize(): bool
-    {
-        return true;
     }
 }

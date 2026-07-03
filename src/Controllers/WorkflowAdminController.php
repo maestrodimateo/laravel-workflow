@@ -47,6 +47,9 @@ class WorkflowAdminController extends Controller
 
     public function updateTransition(Request $request, Basket $from, Basket $to): JsonResponse
     {
+        // Prevent cross-circuit transitions: both baskets must belong to the same circuit.
+        abort_unless($from->circuit_id === $to->circuit_id, 404);
+
         $data = $request->validate([
             'label' => ['nullable', 'string', 'max:255'],
             'actions' => ['nullable', 'array'],

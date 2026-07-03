@@ -37,7 +37,7 @@ Route::prefix('api')->name('workflow.admin.')->group(function (): void {
         Route::delete('/{basket}', [BasketController::class, 'destroy'])->name('destroy');
     });
 
-    Route::prefix('circuits/{circuit}/messages')->name('messages.')->group(function (): void {
+    Route::prefix('circuits/{circuit}/messages')->name('messages.')->scopeBindings()->group(function (): void {
         Route::post('/', [MessageController::class, 'store'])->name('store');
         Route::put('/{message}', [MessageController::class, 'update'])->name('update');
         Route::delete('/{message}', [MessageController::class, 'destroy'])->name('destroy');

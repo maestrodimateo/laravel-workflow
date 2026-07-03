@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 /**
  * @property-read string $id
  * @property string $previous_status
+ * @property string|null $previous_status_label
  * @property string $next_status
+ * @property string|null $next_status_label
  * @property string $comment
  * @property string $done_by
  * @property int|null $duration_seconds
@@ -22,7 +24,9 @@ class History extends Model
 
     protected $fillable = [
         'previous_status',
+        'previous_status_label',
         'next_status',
+        'next_status_label',
         'comment',
         'done_by',
         'duration_seconds',

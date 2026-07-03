@@ -41,7 +41,7 @@ class SyncFlagAction implements TransitionAction
  * Test action that opts into queue dispatch with custom queue + connection
  * names so tests can verify they are forwarded to the dispatched job.
  */
-class QueueableFlagAction implements TransitionAction, QueueableAction
+class QueueableFlagAction implements QueueableAction, TransitionAction
 {
     public static array $invocations = [];
 
@@ -76,7 +76,7 @@ class QueueableFlagAction implements TransitionAction, QueueableAction
  * the existing after-commit branch is preserved alongside the new queueable
  * branch.
  */
-class AfterCommitFlagAction implements TransitionAction, AfterCommitAction
+class AfterCommitFlagAction implements AfterCommitAction, TransitionAction
 {
     public static array $invocations = [];
 
@@ -187,6 +187,22 @@ it('runs an AfterCommitAction inline after commit, not via the queue', function 
 
     expect(AfterCommitFlagAction::$invocations)->toBe([$model->getKey()]);
     Bus::assertNotDispatched(ExecuteTransitionActionJob::class);
+});
+
+it('applies the configured retry policy to the dispatched job', function () {
+    config()->set('workflow.actions_queue.tries', 5);
+    config()->set('workflow.actions_queue.timeout', 42);
+
+    $review = makeTransitionWithActions(['queueable_flag']);
+    $model = Test::create(['name' => 'Invoice #Q3']);
+    $draft = Basket::query()->where('status', 'DRAFT')->first();
+
+    $job = new ExecuteTransitionActionJob(QueueableFlagAction::class, $model, $draft, $review);
+
+    expect($job->tries)->toBe(5)
+        ->and($job->timeout)->toBe(42)
+        ->and($job->deleteWhenMissingModels)->toBeTrue()
+        ->and($job->backoff())->toBe([10, 30, 60]);
 });
 
 it('executes the wrapped action when the job is processed by a worker', function () {

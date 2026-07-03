@@ -546,9 +546,11 @@
                         },
                     });
 
-                    // Restore existing content
+                    // Restore existing content through Quill's paste pipeline,
+                    // which strips tags/attributes outside its format whitelist
+                    // (e.g. onerror handlers) instead of injecting raw innerHTML.
                     if (this.messageForm.content) {
-                        editor.root.innerHTML = this.messageForm.content;
+                        editor.clipboard.dangerouslyPasteHTML(this.messageForm.content);
                     }
 
                     // Sync editor changes back to form state

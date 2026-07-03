@@ -9,16 +9,24 @@ class MessageVariableResolver
 {
     /**
      * Replace {{ variable }} placeholders in a string with resolved values.
+     *
+     * @param  bool  $escapeHtml  Escape substituted values (use when the target
+     *                            is HTML, e.g. the email body, so a variable
+     *                            value cannot inject markup).
      */
-    public static function resolve(string $content, Model $model, Basket $from, Basket $to): string
+    public static function resolve(string $content, Model $model, Basket $from, Basket $to, bool $escapeHtml = false): string
     {
         $variables = static::getVariables($model, $from, $to);
 
         // Replace {{ key }} patterns
-        return preg_replace_callback('/\{\{\s*(\w+)\s*\}\}/', function ($matches) use ($variables) {
+        return preg_replace_callback('/\{\{\s*(\w+)\s*\}\}/', function ($matches) use ($variables, $escapeHtml) {
             $key = $matches[1];
 
-            return $variables[$key] ?? $matches[0]; // Keep original if unknown
+            if (! array_key_exists($key, $variables)) {
+                return $matches[0]; // Keep original if unknown
+            }
+
+            return $escapeHtml ? e($variables[$key]) : $variables[$key];
         }, $content);
     }
 

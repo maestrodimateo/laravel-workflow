@@ -2,6 +2,7 @@
 
 namespace Maestrodimateo\Workflow;
 
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Maestrodimateo\Workflow\Actions\LogTransitionAction;
@@ -26,6 +27,7 @@ class WorkflowServiceProvider extends ServiceProvider
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'workflow');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'workflow');
+        $this->registerAuthorization();
         $this->loadRoutes();
         $this->registerBuiltInActions();
 
@@ -62,18 +64,37 @@ class WorkflowServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Define a safe default authorization gate when the application has not
+     * provided its own. The default only grants access in the local
+     * environment, keeping production locked down until the consumer defines
+     * their own `manage-workflow` gate.
+     */
+    private function registerAuthorization(): void
+    {
+        $ability = config('workflow.authorization.gate');
+
+        if ($ability && ! Gate::has($ability)) {
+            Gate::define($ability, fn ($user = null): bool => $this->app->environment('local'));
+        }
+    }
+
     private function loadRoutes(): void
     {
         $prefix = config('workflow.routes.prefix', 'workflow');
 
+        // Authorization gate applied on top of every workflow route.
+        $ability = config('workflow.authorization.gate');
+        $authorize = $ability ? ['can:'.$ability] : [];
+
         // Public API routes
         Route::prefix($prefix)
-            ->middleware(config('workflow.routes.middleware', ['api']))
+            ->middleware([...config('workflow.routes.middleware', ['api', 'auth']), ...$authorize])
             ->group(__DIR__.'/../routes/api.php');
 
         // Admin UI + Admin API (share web middleware for session-based auth)
         Route::prefix($prefix.'/admin')
-            ->middleware(config('workflow.routes.admin_middleware', ['web']))
+            ->middleware([...config('workflow.routes.admin_middleware', ['web', 'auth']), ...$authorize])
             ->group(__DIR__.'/../routes/admin.php');
     }
 }

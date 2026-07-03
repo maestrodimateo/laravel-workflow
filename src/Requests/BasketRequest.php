@@ -2,7 +2,6 @@
 
 namespace Maestrodimateo\Workflow\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
@@ -14,7 +13,7 @@ use Illuminate\Validation\Rule;
  * @property mixed $roles
  * @property mixed $previous
  */
-class BasketRequest extends FormRequest
+class BasketRequest extends WorkflowFormRequest
 {
     /**
      * Get the validation rules that apply to the request.
@@ -61,13 +60,5 @@ class BasketRequest extends FormRequest
             'previous.array' => __('workflow::workflow.validation.previous_array'),
             'previous.*.exists' => __('workflow::workflow.validation.previous_invalid'),
         ];
-    }
-
-    /**
-     * Determine if the user is authorized to make this request.
-     */
-    public function authorize(): bool
-    {
-        return true;
     }
 }

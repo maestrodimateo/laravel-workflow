@@ -14,7 +14,7 @@ return [
             'name_placeholder' => 'Ex: En révision',
             'status_placeholder' => 'REVIEW',
         ],
-        
+
         'circuit_modal' => [
             'edit_title' => 'Modifier le circuit',
             'new_title' => 'Nouveau circuit',
@@ -29,7 +29,7 @@ return [
             'no_roles' => 'Aucun',
             'add_role_placeholder' => 'admin, manager...',
         ],
-        
+
         'message_modal' => [
             'title' => 'Nouveau message',
             'subtitle' => 'Ce message sera disponible pour les actions de transition.',
@@ -42,7 +42,7 @@ return [
             'variables' => 'Variables disponibles',
             'click_to_insert' => 'Cliquez pour insérer dans le contenu :',
         ],
-        
+
         'transition_modal' => [
             'title' => 'Configurer la transition',
             'label' => 'Label (optionnel)',
@@ -56,7 +56,7 @@ return [
             'document_label_placeholder' => 'Label (ex: Pièce d\'identité)',
             'add_document_button' => 'Ajouter un document requis',
         ],
-        
+
         'header' => [
             'title' => 'Workflow Designer',
             'select_circuit' => 'Choisir un circuit',
@@ -68,7 +68,7 @@ return [
             'delete' => 'Supprimer',
             'dark_mode' => 'Mode sombre/clair',
         ],
-        
+
         'toolbar' => [
             'linking_mode' => 'Cliquez sur un panier cible — ',
             'cancel_link' => 'Annuler',
@@ -76,7 +76,7 @@ return [
             'messages' => 'Messages',
             'add_basket' => 'Ajouter',
         ],
-        
+
         'sidebar' => [
             'select_basket' => 'Sélectionnez un panier',
             'click_basket' => 'Cliquez sur un panier pour voir ses détails',
@@ -99,13 +99,13 @@ return [
             'final_step' => 'Aucune — étape finale',
             'add_transition_placeholder' => 'Ajouter...',
         ],
-        
+
         'canvas' => [
             'fin' => 'FIN',
             'empty_message' => 'Sélectionnez ou créez un circuit',
             'empty_button' => 'Créer un circuit',
         ],
-        
+
         'buttons' => [
             'new' => 'Nouveau',
             'cancel' => 'Annuler',
@@ -116,14 +116,14 @@ return [
             'add' => 'Ajouter',
         ],
     ],
-    
+
     'actions' => [
         'log' => 'Log transition',
         'require_document' => 'Require documents',
         'send_email' => 'Send email',
         'webhook' => 'Call webhook',
     ],
-    
+
     'notifications' => [
         'messages_panel_title' => 'Messages du circuit',
         'circuit_updated' => 'Circuit mis à jour',
@@ -147,16 +147,16 @@ return [
         'confirm_delete_message' => 'Supprimer ?',
         'server_error' => 'Erreur serveur',
     ],
-    
+
     'exceptions' => [
         'model_locked' => 'This model is locked by another user',
-        'invalid_transition' => 'Invalid transition',
+        'invalid_transition' => 'Aucune transition n\'est définie de « :from » vers « :to ».',
         'circuit_not_found' => 'Circuit not found',
         'basket_not_found' => 'Basket not found',
         'missing_documents' => 'Missing documents: ',
         'driver_not_implemented' => 'The message driver is not implemented yet',
     ],
-    
+
     'validation' => [
         'color_required' => 'La couleur du panier est obligatoire',
         'color_regex' => 'La couleur doit être un code hexadécimal valide (ex: #2563eb)',
@@ -182,7 +182,7 @@ return [
         'circuit_uuid_invalid' => 'L\'identifiant du circuit est invalide',
         'circuit_exists' => 'Le circuit n\'existe pas',
     ],
-    
+
     'variables' => [
         'model_id' => 'Identifiant du modèle',
         'model_type' => 'Type du modèle',

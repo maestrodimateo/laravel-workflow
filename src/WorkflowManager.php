@@ -4,6 +4,7 @@ namespace Maestrodimateo\Workflow;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -11,6 +12,7 @@ use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
 use Maestrodimateo\Workflow\Contracts\QueueableAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Events\TransitionEvent;
+use Maestrodimateo\Workflow\Exceptions\InvalidTransitionException;
 use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
 use Maestrodimateo\Workflow\Jobs\ExecuteTransitionActionJob;
 use Maestrodimateo\Workflow\Models\Basket;
@@ -102,31 +104,84 @@ class WorkflowManager
     /**
      * Transition a single model to the next basket.
      *
+     * The whole operation runs inside one transaction that first acquires a
+     * pessimistic lock on the subject row, so two concurrent transitions on
+     * the same model are serialized (no double-move / double-history). The
+     * target basket must be reachable from the current status, otherwise an
+     * {@see InvalidTransitionException} is thrown and nothing is changed.
+     *
+     * Any lock held by the current user is released once the attempt
+     * completes — whether it succeeds or fails — so a failed transition never
+     * leaves the model stuck locked.
+     *
      * @throws Throwable
      * @throws ModelLockedException If the model is locked by another user
+     * @throws InvalidTransitionException If the target basket is not reachable
      */
     public function transition(string $nextBasketId, ?string $comment = null): bool
     {
-        $this->guardAgainstLock();
-
-        $currentBasket = $this->currentStatus();
         $nextBasket = Basket::query()->findOrFail($nextBasketId);
 
-        return DB::transaction(function () use ($currentBasket, $nextBasket, $comment) {
-            $this->repository->moveModelToNextBasket($currentBasket, $nextBasket, $this->subject);
+        try {
+            return DB::transaction(function () use ($nextBasket, $comment) {
+                // Serialize concurrent transitions on the same subject.
+                $this->lockSubjectRow();
 
-            $this->executeTransitionActions($currentBasket, $nextBasket);
+                $this->guardAgainstLock();
 
-            event(new TransitionEvent($currentBasket, $nextBasket, $this->subject, $comment));
+                $currentBasket = $this->currentStatus();
+                $this->guardAgainstInvalidTransition($currentBasket, $nextBasket);
 
+                $this->repository->moveModelToNextBasket($currentBasket, $nextBasket, $this->subject);
+
+                $this->executeTransitionActions($currentBasket, $nextBasket);
+
+                event(new TransitionEvent($currentBasket, $nextBasket, $this->subject, $comment));
+
+                return true;
+            });
+        } finally {
             $this->unlock();
+        }
+    }
 
-            return true;
-        });
+    /**
+     * Acquire a pessimistic row-level lock on the subject to serialize
+     * concurrent transitions. No-op on drivers without row locking (e.g.
+     * SQLite), where transactions already serialize writes.
+     */
+    protected function lockSubjectRow(): void
+    {
+        $this->subject->newQuery()
+            ->whereKey($this->subject->getKey())
+            ->lockForUpdate()
+            ->first();
+    }
+
+    /**
+     * Ensure the target basket is reachable from the current status.
+     *
+     * @throws InvalidTransitionException
+     */
+    protected function guardAgainstInvalidTransition(?Basket $currentBasket, Basket $nextBasket): void
+    {
+        $reachable = $currentBasket !== null
+            && $currentBasket->next()->whereKey($nextBasket->id)->exists();
+
+        if (! $reachable) {
+            throw new InvalidTransitionException($currentBasket, $nextBasket);
+        }
     }
 
     /**
      * Transition multiple models to the same basket using chunked bulk SQL.
+     *
+     * NOTE: this is a bulk administrative path. Unlike {@see transition()}, it
+     * does NOT run transition actions (webhooks, emails, logs) and does NOT
+     * emit {@see TransitionEvent}. Models whose transition requires document
+     * validation ({@see RequireDocumentAction}) are skipped rather than moved,
+     * so the requirement is never silently bypassed — transition them one by
+     * one instead.
      *
      * @param  iterable<Model>  $models  Collection or array of models
      * @param  string  $nextBasketId  Target basket UUID
@@ -151,17 +206,22 @@ class WorkflowManager
 
         $modelType = $models->first()::class;
         $currentUserId = $this->currentUserId();
+        // Resolve the circuit's basket ids once, not per chunk.
+        $circuitBasketIds = $this->circuitId
+            ? Basket::where('circuit_id', $this->circuitId)->pluck('id')->all()
+            : null;
         $totalTransitioned = 0;
         $allSkipped = [];
 
-        DB::transaction(function () use ($models, $modelType, $nextBasket, $comment, $currentUserId, $chunkSize, &$totalTransitioned, &$allSkipped) {
-            $models->chunk($chunkSize)->each(function ($chunk) use ($modelType, $nextBasket, $comment, $currentUserId, &$totalTransitioned, &$allSkipped) {
+        DB::transaction(function () use ($models, $modelType, $nextBasket, $comment, $currentUserId, $circuitBasketIds, $chunkSize, &$totalTransitioned, &$allSkipped) {
+            $models->chunk($chunkSize)->each(function ($chunk) use ($modelType, $nextBasket, $comment, $currentUserId, $circuitBasketIds, &$totalTransitioned, &$allSkipped) {
                 $result = $this->transitionChunk(
                     $chunk->pluck('id')->all(),
                     $modelType,
                     $nextBasket,
                     $comment,
                     $currentUserId,
+                    $circuitBasketIds,
                 );
                 $totalTransitioned += $result['transitioned'];
                 $allSkipped = array_merge($allSkipped, $result['skipped']);
@@ -176,6 +236,8 @@ class WorkflowManager
 
     /**
      * Process a single chunk of model IDs for bulk transition.
+     *
+     * @param  array<int, string>|null  $circuitBasketIds  Pre-resolved circuit basket ids (scope), or null
      */
     protected function transitionChunk(
         array $modelIds,
@@ -183,6 +245,7 @@ class WorkflowManager
         Basket $nextBasket,
         ?string $comment,
         string $currentUserId,
+        ?array $circuitBasketIds = null,
     ): array {
         $now = now();
 
@@ -191,14 +254,13 @@ class WorkflowManager
             ->where('statusable_type', $modelType)
             ->whereIn('statusable_id', $modelIds);
 
-        if ($this->circuitId) {
-            $circuitBasketIds = Basket::where('circuit_id', $this->circuitId)->pluck('id');
+        if ($circuitBasketIds !== null) {
             $assignmentQuery->whereIn('basket_id', $circuitBasketIds);
         }
 
         $currentAssignments = $assignmentQuery->get()
             ->groupBy('statusable_id')
-            ->map(fn ($rows) => $rows->sortByDesc('created_at')->first());
+            ->map(fn ($rows) => $rows->sortByDesc('id')->first());
 
         // 2. Locked by others
         $lockedByOthers = DB::table('workflow_locks')
@@ -229,6 +291,26 @@ class WorkflowManager
         $eligibleIds = array_keys($eligible);
         $previousBasketIds = array_unique(array_values($eligible));
 
+        // 3b. Skip models whose transition requires document validation: bulk
+        // mode cannot verify documents, so never move them silently.
+        $docRequiredFrom = $this->basketsRequiringDocuments($previousBasketIds, $nextBasket->id);
+
+        if ($docRequiredFrom !== []) {
+            foreach ($eligible as $id => $fromBasketId) {
+                if (in_array($fromBasketId, $docRequiredFrom, true)) {
+                    $skipped[] = ['id' => $id, 'reason' => 'Requires document validation'];
+                    unset($eligible[$id]);
+                }
+            }
+
+            if (empty($eligible)) {
+                return ['transitioned' => 0, 'skipped' => $skipped];
+            }
+
+            $eligibleIds = array_keys($eligible);
+            $previousBasketIds = array_unique(array_values($eligible));
+        }
+
         // 4. Bulk detach
         DB::table('statusable')
             ->where('statusable_type', $modelType)
@@ -248,7 +330,9 @@ class WorkflowManager
         );
 
         // 6. Bulk history insert
-        $previousStatuses = Basket::whereIn('id', $previousBasketIds)->pluck('status', 'id');
+        $previousBaskets = Basket::whereIn('id', $previousBasketIds)->get(['id', 'status', 'name'])->keyBy('id');
+        $previousStatuses = $previousBaskets->map(fn ($b) => $b->status);
+        $previousLabels = $previousBaskets->map(fn ($b) => $b->name);
 
         $lastDates = DB::table('histories')
             ->where('historable_type', $modelType)
@@ -266,16 +350,18 @@ class WorkflowManager
                 ->pluck('created_at', 'id');
 
         DB::table('histories')->insert(
-            array_map(function ($id) use ($eligible, $previousStatuses, $nextBasket, $comment, $currentUserId, $now, $lastDates, $creationDates, $modelType) {
+            array_map(function ($id) use ($eligible, $previousStatuses, $previousLabels, $nextBasket, $comment, $currentUserId, $now, $lastDates, $creationDates, $modelType) {
                 $since = $lastDates[$id] ?? $creationDates[$id] ?? null;
-                $duration = $since ? (int) $now->diffInSeconds(Carbon::parse($since)) : null;
+                $duration = $since ? (int) Carbon::parse($since)->diffInSeconds($now) : null;
 
                 return [
                     'id' => Str::uuid()->toString(),
                     'historable_type' => $modelType,
                     'historable_id' => $id,
                     'previous_status' => $previousStatuses[$eligible[$id]] ?? 'UNKNOWN',
+                    'previous_status_label' => $previousLabels[$eligible[$id]] ?? null,
                     'next_status' => $nextBasket->status,
+                    'next_status_label' => $nextBasket->name,
                     'comment' => $comment,
                     'done_by' => $currentUserId,
                     'duration_seconds' => $duration,
@@ -354,9 +440,56 @@ class WorkflowManager
     {
         $pivot = $from->next()->where('to_basket_id', $to->id)->first()?->pivot;
 
-        $actions = json_decode($pivot?->actions ?? '[]', true, 512, JSON_THROW_ON_ERROR);
+        return $this->decodePivotActions($pivot?->actions);
+    }
+
+    /**
+     * Decode the actions JSON stored on a transition pivot row.
+     *
+     * @return array<int, array{type: string, config: array}>
+     */
+    protected function decodePivotActions(?string $json): array
+    {
+        $actions = json_decode($json ?? '[]', true, 512, JSON_THROW_ON_ERROR);
 
         return is_array($actions) ? $actions : [];
+    }
+
+    /**
+     * Return the "from" basket ids (among the given ones) whose transition to
+     * $toBasketId carries a require_document action.
+     *
+     * @param  array<int, string>  $fromBasketIds
+     * @return array<int, string>
+     */
+    protected function basketsRequiringDocuments(array $fromBasketIds, string $toBasketId): array
+    {
+        if ($fromBasketIds === []) {
+            return [];
+        }
+
+        return DB::table('transition')
+            ->where('to_basket_id', $toBasketId)
+            ->whereIn('from_basket_id', $fromBasketIds)
+            ->get(['from_basket_id', 'actions'])
+            ->filter(fn ($row) => collect($this->decodePivotActions($row->actions))
+                ->contains(fn ($a) => ($a['type'] ?? null) === 'require_document'))
+            ->pluck('from_basket_id')
+            ->all();
+    }
+
+    /**
+     * Extract the list of required documents from a set of decoded actions.
+     *
+     * @param  array<int, array{type: string, config: array}>  $actions
+     */
+    protected function extractRequiredDocuments(array $actions): array
+    {
+        return collect($actions)
+            ->where('type', 'require_document')
+            ->flatMap(fn ($a) => $a['config']['documents'] ?? [])
+            ->values()
+            ->all();
     }
 
     // -------------------------------------------------------------------------
@@ -373,34 +506,58 @@ class WorkflowManager
      */
     public function lock(?int $minutes = null): WorkflowLock
     {
-        $this->cleanExpiredLock();
-
-        $existingLock = $this->getActiveLock();
         $currentUserId = $this->currentUserId();
+        $expiresAt = now()->addMinutes($minutes ?? config('workflow.lock.duration_minutes', 30));
 
-        // Already locked by someone else
-        if ($existingLock && $existingLock->locked_by !== $currentUserId) {
-            throw new ModelLockedException($existingLock);
-        }
+        return DB::transaction(function () use ($currentUserId, $expiresAt) {
+            $this->cleanExpiredLock();
+            $existingLock = $this->getActiveLock();
 
-        // Already locked by the same user — extend it
-        if ($existingLock && $existingLock->locked_by === $currentUserId) {
-            $existingLock->update([
-                'expires_at' => now()->addMinutes($minutes ?? config('workflow.lock.duration_minutes', 30)),
-            ]);
+            // Already locked by someone else
+            if ($existingLock && $existingLock->locked_by !== $currentUserId) {
+                throw new ModelLockedException($existingLock);
+            }
 
-            return $existingLock->refresh();
-        }
+            // Already locked by the same user — extend it
+            if ($existingLock) {
+                $existingLock->update(['expires_at' => $expiresAt]);
 
-        // Create new lock
-        $lock = $this->subject->workflowLock()->create([
-            'locked_by' => $currentUserId,
-            'expires_at' => now()->addMinutes($minutes ?? config('workflow.lock.duration_minutes', 30)),
-        ]);
+                return $existingLock->refresh();
+            }
 
-        $this->subject->unsetRelation('workflowLock');
+            // Create a new lock. The unique(lockable_type, lockable_id) constraint
+            // is the real guard against a concurrent insert slipping between the
+            // check above and here (TOCTOU): translate a violation into a proper
+            // ModelLockedException instead of leaking a raw QueryException.
+            try {
+                $lock = $this->subject->workflowLock()->create([
+                    'locked_by' => $currentUserId,
+                    'expires_at' => $expiresAt,
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                $this->subject->unsetRelation('workflowLock');
+                $existingLock = $this->getActiveLock();
 
-        return $lock;
+                if ($existingLock && $existingLock->locked_by !== $currentUserId) {
+                    throw new ModelLockedException($existingLock);
+                }
+
+                // The winning row is ours (or already expired); reuse it.
+                if ($existingLock) {
+                    $existingLock->update(['expires_at' => $expiresAt]);
+
+                    return $existingLock->refresh();
+                }
+
+                throw new ModelLockedException(
+                    $this->subject->workflowLock()->firstOrFail()
+                );
+            }
+
+            $this->subject->unsetRelation('workflowLock');
+
+            return $lock;
+        });
     }
 
     /**
@@ -507,11 +664,7 @@ class WorkflowManager
 
         $actions = $this->decodeTransitionActions($current, Basket::find($nextBasketId));
 
-        return collect($actions)
-            ->where('type', 'require_document')
-            ->flatMap(fn ($a) => $a['config']['documents'] ?? [])
-            ->values()
-            ->all();
+        return $this->extractRequiredDocuments($actions);
     }
 
     /**
@@ -524,20 +677,17 @@ class WorkflowManager
             return [];
         }
 
-        return $current->next()->get()->map(function (Basket $next) use ($current) {
-            $actions = $this->decodeTransitionActions($current, $next);
-            $docs = collect($actions)
-                ->where('type', 'require_document')
-                ->flatMap(fn ($a) => $a['config']['documents'] ?? [])
-                ->values()
-                ->all();
+        // The pivot (label + actions) is already eager-loaded by next()->get(),
+        // so decode it directly instead of re-querying per basket (N+1).
+        return $current->next()->get()->mapWithKeys(function (Basket $next) {
+            $actions = $this->decodePivotActions($next->pivot->actions ?? null);
 
-            return [
+            return [$next->id => [
                 'basket' => $next,
                 'label' => $next->pivot->label,
-                'documents' => $docs,
-            ];
-        })->keyBy(fn ($item) => $item['basket']->id)->all();
+                'documents' => $this->extractRequiredDocuments($actions),
+            ]];
+        })->all();
     }
 
     // -------------------------------------------------------------------------
@@ -582,7 +732,7 @@ class WorkflowManager
         $baskets = $this->subject->baskets()->with('circuit')->get();
 
         return $baskets->groupBy('circuit_id')->map(function ($circuitBaskets) {
-            $latest = $circuitBaskets->sortByDesc('pivot.created_at')->first();
+            $latest = $circuitBaskets->sortByDesc('pivot.id')->first();
 
             return [
                 'circuit' => $latest->circuit,

@@ -9,8 +9,9 @@ use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Emails\TransitionMail;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Message;
+use Maestrodimateo\Workflow\Services\MessageVariableResolver;
 
-class SendEmailAction implements TransitionAction, QueueableAction
+class SendEmailAction implements QueueableAction, TransitionAction
 {
     public static function key(): string
     {
@@ -44,7 +45,13 @@ class SendEmailAction implements TransitionAction, QueueableAction
 
         if ($message && method_exists($model, 'recipient')) {
             $recipient = $model->recipient($message);
-            Mail::to($recipient)->send(new TransitionMail($message));
+
+            // Substitute {{ variables }} at send time. The subject is plain text;
+            // the content is HTML, so its values are HTML-escaped.
+            $resolvedSubject = MessageVariableResolver::resolve($message->subject, $model, $from, $to);
+            $resolvedContent = MessageVariableResolver::resolve($message->content, $model, $from, $to, escapeHtml: true);
+
+            Mail::to($recipient)->send(new TransitionMail($message, $resolvedContent, $resolvedSubject));
         }
     }
 }

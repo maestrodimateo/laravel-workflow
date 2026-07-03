@@ -13,7 +13,9 @@ class HistoryResource extends JsonResource
         return [
             'id' => $this->id,
             'previous_status' => $this->previous_status,
+            'previous_status_label' => $this->previous_status_label,
             'next_status' => $this->next_status,
+            'next_status_label' => $this->next_status_label,
             'comment' => $this->comment,
             'done_by' => $this->done_by,
             'duration_seconds' => $this->duration_seconds,

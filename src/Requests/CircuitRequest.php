@@ -2,7 +2,6 @@
 
 namespace Maestrodimateo\Workflow\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Maestrodimateo\Workflow\Models\Circuit;
 
@@ -11,7 +10,7 @@ use Maestrodimateo\Workflow\Models\Circuit;
  * @property string $name
  * @property string|null $description
  */
-class CircuitRequest extends FormRequest
+class CircuitRequest extends WorkflowFormRequest
 {
     /**
      * Get the validation rules that apply to the request.
@@ -40,13 +39,5 @@ class CircuitRequest extends FormRequest
             'targetModel.required' => __('workflow::workflow.validation.circuit_target_required'),
             'name.unique' => __('workflow::workflow.validation.circuit_name_unique'),
         ];
-    }
-
-    /**
-     * Determine if the user is authorized to make this request.
-     */
-    public function authorize(): bool
-    {
-        return true;
     }
 }

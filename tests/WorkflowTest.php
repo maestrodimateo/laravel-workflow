@@ -117,7 +117,9 @@ it('records a history entry after a transition', function () {
 
     expect($history)->toHaveCount(1)
         ->and($history->first()->previous_status)->toBe('DRAFT')
+        ->and($history->first()->previous_status_label)->toBe('Draft')
         ->and($history->first()->next_status)->toBe('REVIEW')
+        ->and($history->first()->next_status_label)->toBe('Review')
         ->and($history->first()->comment)->toBe('Moving forward');
 });
 

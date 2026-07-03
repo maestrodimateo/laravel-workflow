@@ -12,14 +12,18 @@ class HistoryListener
             return;
         }
 
-        // Calculate duration since the last transition (or model creation)
+        // Calculate duration since the last transition (or model creation).
+        // Diff from the past date to now so the value stays positive under
+        // Carbon 3, where diffInSeconds is signed by default.
         $lastEntry = $event->model->histories()->latest()->first();
         $since = $lastEntry ? $lastEntry->created_at : $event->model->created_at;
-        $durationSeconds = $since ? (int) now()->diffInSeconds($since) : null;
+        $durationSeconds = $since ? (int) $since->diffInSeconds(now()) : null;
 
         $event->model->histories()->create([
             'previous_status' => $event->currentBasket->status,
+            'previous_status_label' => $event->currentBasket->name,
             'next_status' => $event->nextBasket->status,
+            'next_status_label' => $event->nextBasket->name,
             'comment' => $event->comment,
             'done_by' => auth()->user()?->{config('workflow.auth_identifier', 'id')} ?? 'system',
             'duration_seconds' => $durationSeconds,

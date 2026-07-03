@@ -42,7 +42,9 @@ trait Workflowable
     /** All baskets this model is/has been in (across all circuits) */
     public function baskets(): MorphToMany
     {
-        return $this->morphToMany(Basket::class, 'statusable', 'statusable', 'statusable_id', 'basket_id');
+        return $this->morphToMany(Basket::class, 'statusable', 'statusable', 'statusable_id', 'basket_id')
+            ->withPivot('id')
+            ->withTimestamps();
     }
 
     /** All history entries across all circuits */
@@ -58,7 +60,10 @@ trait Workflowable
      */
     public function currentStatus(string|Circuit|null $circuit = null): ?Basket
     {
-        $query = $this->baskets()->orderByPivot('created_at', 'desc');
+        // Order by the pivot's auto-increment id (monotonic) rather than
+        // created_at (second-granularity), so rapid/concurrent transitions
+        // still resolve to a deterministic "latest" status.
+        $query = $this->baskets()->orderByPivot('id', 'desc');
 
         if ($circuit) {
             $circuitId = $circuit instanceof Circuit ? $circuit->id : $circuit;

@@ -7,9 +7,11 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Maestrodimateo\Workflow\Contracts\QueueableAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
+use Maestrodimateo\Workflow\Exceptions\UnsafeWebhookUrlException;
 use Maestrodimateo\Workflow\Models\Basket;
+use Maestrodimateo\Workflow\Support\WebhookGuard;
 
-class WebhookAction implements TransitionAction, QueueableAction
+class WebhookAction implements QueueableAction, TransitionAction
 {
     public static function key(): string
     {
@@ -33,6 +35,7 @@ class WebhookAction implements TransitionAction, QueueableAction
 
     /**
      * @throws ConnectionException
+     * @throws UnsafeWebhookUrlException If the URL targets a disallowed or non-public host
      */
     public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
     {
@@ -42,11 +45,16 @@ class WebhookAction implements TransitionAction, QueueableAction
             return;
         }
 
-        Http::post($url, [
-            'model_type' => $model::class,
-            'model_id' => $model->getKey(),
-            'from_status' => $from->status,
-            'to_status' => $to->status,
-        ]);
+        // Guard against SSRF before firing the request server-side.
+        WebhookGuard::assertAllowed($url);
+
+        Http::withoutRedirecting()
+            ->timeout((int) config('workflow.webhook.timeout', 5))
+            ->post($url, [
+                'model_type' => $model::class,
+                'model_id' => $model->getKey(),
+                'from_status' => $from->status,
+                'to_status' => $to->status,
+            ]);
     }
 }

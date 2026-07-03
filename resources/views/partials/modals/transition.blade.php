@@ -4,8 +4,8 @@
 <template x-teleport="body">
 <div x-show="modal==='transition'" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" x-transition.opacity>
     <div class="fixed inset-0 bg-black/50" @click="modal=null"></div>
-    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-lg mx-4 relative z-10 fade-in">
-        <div class="px-6 py-4 border-b border-border">
+    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-lg mx-4 relative z-10 fade-in flex flex-col max-h-[90vh]">
+        <div class="px-6 py-4 border-b border-border shrink-0">
             <h3 class="text-base font-semibold text-foreground">{{ __('workflow::workflow.ui.transition_modal.title') }}</h3>
             <p class="text-xs text-muted-foreground mt-0.5" x-show="tConfig.from && tConfig.to">
                 <span x-text="tConfig.from?.name"></span>
@@ -13,7 +13,7 @@
                 <span x-text="tConfig.to?.name"></span>
             </p>
         </div>
-        <div class="p-6 space-y-4">
+        <div class="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
             <div>
                 <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.transition_modal.label') }}</label>
                 <input x-model="tConfig.label" class="sh-input w-full" placeholder="{{ __('workflow::workflow.ui.transition_modal.label_placeholder') }}">
@@ -83,11 +83,11 @@
                 </div>
                 <p x-show="!tConfig.actions.length" class="text-xs text-muted-foreground">{{ __('workflow::workflow.ui.transition_modal.no_actions') }}</p>
             </div>
+        </div>
 
-            <div class="flex justify-end gap-2 pt-2">
-                <button @click="modal=null" class="sh-btn sh-btn-outline h-9">{{ __('workflow::workflow.ui.buttons.cancel') }}</button>
-                <button @click="saveTransitionConfig()" :disabled="busy" class="sh-btn sh-btn-primary h-9 disabled:opacity-50"><span x-text="busy ? '...' : '{{ __('workflow::workflow.ui.buttons.save') }}'"></span></button>
-            </div>
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-border shrink-0">
+            <button @click="modal=null" class="sh-btn sh-btn-outline h-9">{{ __('workflow::workflow.ui.buttons.cancel') }}</button>
+            <button @click="saveTransitionConfig()" :disabled="busy" class="sh-btn sh-btn-primary h-9 disabled:opacity-50"><span x-text="busy ? '...' : '{{ __('workflow::workflow.ui.buttons.save') }}'"></span></button>
         </div>
     </div>
 </div>

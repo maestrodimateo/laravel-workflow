@@ -2,12 +2,14 @@
 
 namespace Maestrodimateo\Workflow\Contracts;
 
+use Maestrodimateo\Workflow\Jobs\ExecuteTransitionActionJob;
+
 /**
  * Marker interface for transition actions whose `execute()` should run
  * asynchronously on a Laravel queue worker instead of inside the request
  * lifecycle.
  *
- * Queueable actions are wrapped in {@see \Maestrodimateo\Workflow\Jobs\ExecuteTransitionActionJob}
+ * Queueable actions are wrapped in {@see ExecuteTransitionActionJob}
  * and dispatched via `DB::afterCommit()` so the worker never picks up the
  * job before the transition's transaction has been committed (a race that
  * would otherwise let the worker read stale or non-existent rows).
@@ -19,6 +21,13 @@ namespace Maestrodimateo\Workflow\Contracts;
  *
  * QueueableAction implies after-commit semantics, so an action does not
  * need to also implement {@see AfterCommitAction}.
+ *
+ * IMPORTANT — idempotency: Laravel queues guarantee at-least-once delivery, so
+ * execute() may run more than once for the same transition (retry after a
+ * transient failure or worker crash). Make side effects idempotent — e.g. send
+ * with an idempotency key, or dedupe on (subject, from, to) — so a retry does
+ * not send a duplicate email or fire a webhook twice. Retry count, backoff and
+ * timeout are configurable via config('workflow.actions_queue').
  */
 interface QueueableAction extends TransitionAction
 {

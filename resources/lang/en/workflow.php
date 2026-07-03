@@ -14,7 +14,7 @@ return [
             'name_placeholder' => 'Ex: Under review',
             'status_placeholder' => 'REVIEW',
         ],
-        
+
         'circuit_modal' => [
             'edit_title' => 'Edit Circuit',
             'new_title' => 'New Circuit',
@@ -29,7 +29,7 @@ return [
             'no_roles' => 'None',
             'add_role_placeholder' => 'admin, manager...',
         ],
-        
+
         'message_modal' => [
             'title' => 'New Message',
             'subtitle' => 'This message will be available for transition actions.',
@@ -42,7 +42,7 @@ return [
             'variables' => 'Available variables',
             'click_to_insert' => 'Click to insert into content:',
         ],
-        
+
         'transition_modal' => [
             'title' => 'Configure Transition',
             'label' => 'Label (optional)',
@@ -56,7 +56,7 @@ return [
             'document_label_placeholder' => 'Label (ex: ID Card)',
             'add_document_button' => 'Add Required Document',
         ],
-        
+
         'header' => [
             'title' => 'Workflow Designer',
             'select_circuit' => 'Select a circuit',
@@ -68,7 +68,7 @@ return [
             'delete' => 'Delete',
             'dark_mode' => 'Dark/Light mode',
         ],
-        
+
         'toolbar' => [
             'linking_mode' => 'Click on a target basket — ',
             'cancel_link' => 'Cancel',
@@ -76,7 +76,7 @@ return [
             'messages' => 'Messages',
             'add_basket' => 'Add',
         ],
-        
+
         'sidebar' => [
             'select_basket' => 'Select a basket',
             'click_basket' => 'Click on a basket to see its details',
@@ -99,13 +99,13 @@ return [
             'final_step' => 'None — final step',
             'add_transition_placeholder' => 'Add...',
         ],
-        
+
         'canvas' => [
             'fin' => 'END',
             'empty_message' => 'Select or create a circuit',
             'empty_button' => 'Create a circuit',
         ],
-        
+
         'buttons' => [
             'new' => 'New',
             'cancel' => 'Cancel',
@@ -116,14 +116,14 @@ return [
             'add' => 'Add',
         ],
     ],
-    
+
     'actions' => [
         'log' => 'Log transition',
         'require_document' => 'Require documents',
         'send_email' => 'Send email',
         'webhook' => 'Call webhook',
     ],
-    
+
     'notifications' => [
         'messages_panel_title' => 'Circuit Messages',
         'circuit_updated' => 'Circuit updated',
@@ -147,16 +147,16 @@ return [
         'confirm_delete_message' => 'Delete?',
         'server_error' => 'Server error',
     ],
-    
+
     'exceptions' => [
         'model_locked' => 'This model is locked by another user',
-        'invalid_transition' => 'Invalid transition',
+        'invalid_transition' => 'No transition is defined from ":from" to ":to".',
         'circuit_not_found' => 'Circuit not found',
         'basket_not_found' => 'Basket not found',
         'missing_documents' => 'Missing documents: ',
         'driver_not_implemented' => 'The message driver is not implemented yet',
     ],
-    
+
     'validation' => [
         'color_required' => 'Basket color is required',
         'color_regex' => 'Color must be a valid hex code (ex: #2563eb)',
@@ -182,7 +182,7 @@ return [
         'circuit_uuid_invalid' => 'Circuit ID is invalid',
         'circuit_exists' => 'Circuit does not exist',
     ],
-    
+
     'variables' => [
         'model_id' => 'Model ID',
         'model_type' => 'Model type',
