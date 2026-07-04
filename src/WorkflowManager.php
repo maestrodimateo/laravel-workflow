@@ -18,7 +18,7 @@ use Maestrodimateo\Workflow\Jobs\ExecuteTransitionActionJob;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Circuit;
 use Maestrodimateo\Workflow\Models\WorkflowLock;
-use Maestrodimateo\Workflow\Repositories\BasketRepository;
+use Maestrodimateo\Workflow\Support\WorkflowActor;
 use Throwable;
 
 class WorkflowManager
@@ -29,8 +29,6 @@ class WorkflowManager
 
     /** @var array<string, class-string<TransitionAction>> */
     private static array $actions = [];
-
-    public function __construct(private readonly BasketRepository $repository) {}
 
     // -------------------------------------------------------------------------
     // Action registry
@@ -132,7 +130,7 @@ class WorkflowManager
                 $currentBasket = $this->currentStatus();
                 $this->guardAgainstInvalidTransition($currentBasket, $nextBasket);
 
-                $this->repository->moveModelToNextBasket($currentBasket, $nextBasket, $this->subject);
+                $this->moveToBasket($currentBasket, $nextBasket);
 
                 $this->executeTransitionActions($currentBasket, $nextBasket);
 
@@ -171,6 +169,15 @@ class WorkflowManager
         if (! $reachable) {
             throw new InvalidTransitionException($currentBasket, $nextBasket);
         }
+    }
+
+    /**
+     * Move the subject out of its current basket and into the next one.
+     */
+    protected function moveToBasket(Basket $from, Basket $to): void
+    {
+        $this->subject->baskets()->detach($from);
+        $this->subject->baskets()->attach($to);
     }
 
     /**
@@ -645,7 +652,7 @@ class WorkflowManager
      */
     protected function currentUserId(): string
     {
-        return (string) (auth()->user()?->{config('workflow.auth_identifier', 'id')} ?? 'system');
+        return WorkflowActor::id();
     }
 
     // -------------------------------------------------------------------------

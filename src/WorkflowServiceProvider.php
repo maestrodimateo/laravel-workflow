@@ -10,7 +10,6 @@ use Maestrodimateo\Workflow\Actions\RequireDocumentAction;
 use Maestrodimateo\Workflow\Actions\SendEmailAction;
 use Maestrodimateo\Workflow\Actions\WebhookAction;
 use Maestrodimateo\Workflow\Console\MakeTransitionActionCommand;
-use Maestrodimateo\Workflow\Repositories\BasketRepository;
 
 class WorkflowServiceProvider extends ServiceProvider
 {
@@ -18,7 +17,7 @@ class WorkflowServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/workflow.php', 'workflow');
 
-        $this->app->singleton(WorkflowManager::class, fn () => new WorkflowManager(new BasketRepository));
+        $this->app->singleton(WorkflowManager::class, fn () => new WorkflowManager);
 
         $this->app->register(WorkflowEventServiceProvider::class);
     }

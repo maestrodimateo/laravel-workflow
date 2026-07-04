@@ -3,6 +3,7 @@
 namespace Maestrodimateo\Workflow\Listeners;
 
 use Maestrodimateo\Workflow\Events\TransitionEvent;
+use Maestrodimateo\Workflow\Support\WorkflowActor;
 
 class HistoryListener
 {
@@ -25,7 +26,7 @@ class HistoryListener
             'next_status' => $event->nextBasket->status,
             'next_status_label' => $event->nextBasket->name,
             'comment' => $event->comment,
-            'done_by' => auth()->user()?->{config('workflow.auth_identifier', 'id')} ?? 'system',
+            'done_by' => WorkflowActor::id(),
             'duration_seconds' => $durationSeconds,
         ]);
     }
