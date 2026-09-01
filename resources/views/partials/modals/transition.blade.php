@@ -4,9 +4,10 @@
 <template x-teleport="body">
 <div x-show="modal==='transition'" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" x-transition.opacity>
     <div class="fixed inset-0 bg-black/50" @click="modal=null"></div>
-    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-lg mx-4 relative z-10 fade-in flex flex-col max-h-[90vh]">
+    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-lg mx-4 relative z-10 fade-in flex flex-col max-h-[90vh]"
+         role="dialog" aria-modal="true" aria-labelledby="wf-transition-title" data-modal="transition" tabindex="-1" @keydown.tab="trapTab($event)">
         <div class="px-6 py-4 border-b border-border shrink-0">
-            <h3 class="text-base font-semibold text-foreground">{{ __('workflow::workflow.ui.transition_modal.title') }}</h3>
+            <h3 id="wf-transition-title" class="text-base font-semibold text-foreground">{{ __('workflow::workflow.ui.transition_modal.title') }}</h3>
             <p class="text-xs text-muted-foreground mt-0.5" x-show="tConfig.from && tConfig.to">
                 <span x-text="tConfig.from?.name"></span>
                 <span class="mx-1">&rarr;</span>
@@ -29,7 +30,7 @@
                         </button>
                         <div x-show="addOpen" @click.away="addOpen=false" x-cloak
                              class="absolute right-0 top-full mt-1 w-48 bg-card rounded-md border border-border shadow-md py-1 z-50">
-                            <template x-for="a in availableActions" :key="a.key">
+                            <template x-for="a in scopedActions" :key="a.key">
                                 <button @click="addTransitionAction(a.key);addOpen=false"
                                         class="w-full text-left px-3 py-1.5 text-sm hover:bg-accent text-foreground" x-text="a.label"></button>
                             </template>

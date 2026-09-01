@@ -6,108 +6,18 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ __('workflow::workflow.ui.header.title') }}</title>
 
-    {{-- Dependencies --}}
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-    tailwind.config = {
-        darkMode: 'class',
-        theme: {
-            extend: {
-                colors: {
-                    border: 'hsl(var(--border))',
-                    input: 'hsl(var(--input))',
-                    ring: 'hsl(var(--ring))',
-                    background: 'hsl(var(--background))',
-                    foreground: 'hsl(var(--foreground))',
-                    primary: { DEFAULT: 'hsl(var(--primary))', foreground: 'hsl(var(--primary-foreground))' },
-                    muted: { DEFAULT: 'hsl(var(--muted))', foreground: 'hsl(var(--muted-foreground))' },
-                    accent: { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
-                    destructive: { DEFAULT: 'hsl(var(--destructive))', foreground: 'hsl(var(--destructive-foreground))' },
-                    card: { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
-                },
-                borderRadius: { lg: '0.5rem', md: 'calc(0.5rem - 2px)', sm: 'calc(0.5rem - 4px)' },
-            }
-        }
-    }
-    </script>
-    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
-    {{-- Styles — shadcn design tokens --}}
-    <style>
-        :root {
-            --background: 0 0% 100%;
-            --foreground: 240 10% 3.9%;
-            --card: 0 0% 100%;
-            --card-foreground: 240 10% 3.9%;
-            --primary: 240 5.9% 10%;
-            --primary-foreground: 0 0% 98%;
-            --muted: 240 4.8% 95.9%;
-            --muted-foreground: 240 3.8% 46.1%;
-            --accent: 240 4.8% 95.9%;
-            --accent-foreground: 240 5.9% 10%;
-            --destructive: 0 84.2% 60.2%;
-            --destructive-foreground: 0 0% 98%;
-            --border: 240 5.9% 90%;
-            --input: 240 5.9% 90%;
-            --ring: 240 5.9% 10%;
-        }
-        .dark {
-            --background: 240 10% 3.9%;
-            --foreground: 0 0% 98%;
-            --card: 240 10% 3.9%;
-            --card-foreground: 0 0% 98%;
-            --primary: 0 0% 98%;
-            --primary-foreground: 240 5.9% 10%;
-            --muted: 240 3.7% 15.9%;
-            --muted-foreground: 240 5% 64.9%;
-            --accent: 240 3.7% 15.9%;
-            --accent-foreground: 0 0% 98%;
-            --destructive: 0 62.8% 30.6%;
-            --destructive-foreground: 0 0% 98%;
-            --border: 240 3.7% 15.9%;
-            --input: 240 3.7% 15.9%;
-            --ring: 240 4.9% 83.9%;
-        }
-
-        [x-cloak] { display: none !important; }
-        .fade-in { animation: fadeIn .15s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* shadcn-style Quill */
-        .ql-toolbar.ql-snow { border-radius: 6px 6px 0 0; border-color: hsl(var(--border)); background: hsl(var(--background)); }
-        .ql-container.ql-snow { border-radius: 0 0 6px 6px; border-color: hsl(var(--border)); background: hsl(var(--background)); min-height: 100px; font-size: 14px; color: hsl(var(--foreground)); }
-        .ql-editor { min-height: 100px; }
-        .dark .ql-toolbar .ql-stroke { stroke: hsl(var(--muted-foreground)); }
-        .dark .ql-toolbar .ql-fill { fill: hsl(var(--muted-foreground)); }
-        .dark .ql-toolbar .ql-picker-label { color: hsl(var(--muted-foreground)); }
-        .dark .ql-toolbar button:hover .ql-stroke { stroke: hsl(var(--foreground)); }
-        .dark .ql-toolbar button:hover .ql-fill { fill: hsl(var(--foreground)); }
-        .dark .ql-toolbar button.ql-active .ql-stroke { stroke: hsl(var(--foreground)); }
-        .dark .ql-toolbar button.ql-active .ql-fill { fill: hsl(var(--foreground)); }
-        .dark .ql-editor.ql-blank::before { color: hsl(var(--muted-foreground)); }
-
-        /* shadcn input/button base */
-        .sh-input { height: 2.25rem; border-radius: 0.375rem; border: 1px solid hsl(var(--border)); background: transparent; padding: 0.5rem 0.75rem; font-size: 0.875rem; color: hsl(var(--foreground)); outline: none; transition: box-shadow 0.15s; }
-        .sh-input:focus { box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2); border-color: hsl(var(--ring)); }
-        .sh-input::placeholder { color: hsl(var(--muted-foreground)); }
-        .sh-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; height: 2.25rem; padding: 0 1rem; transition: all 0.15s; cursor: pointer; outline: none; }
-        .sh-btn:focus-visible { box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2); }
-        .sh-btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border: none; }
-        .sh-btn-primary:hover { opacity: 0.9; }
-        .sh-btn-outline { background: transparent; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
-        .sh-btn-outline:hover { background: hsl(var(--accent)); }
-        .sh-btn-ghost { background: transparent; color: hsl(var(--foreground)); border: none; }
-        .sh-btn-ghost:hover { background: hsl(var(--accent)); }
-        .sh-btn-destructive { background: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); border: none; }
-        .sh-btn-destructive:hover { opacity: 0.9; }
-        .sh-badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: 0.125rem 0.625rem; font-size: 0.75rem; font-weight: 500; border: 1px solid hsl(var(--border)); background: hsl(var(--background)); color: hsl(var(--foreground)); }
-    </style>
+    {{-- Front-end assets — vendored and served same-origin by the package
+         (no CDN), so the designer works offline / air-gapped and under a
+         strict Content-Security-Policy. Regenerate app.css after editing any
+         Blade view: see tailwind.config.js. --}}
+    <link rel="stylesheet" href="{{ route('workflow.assets', 'app.css') }}">
+    <link rel="stylesheet" href="{{ route('workflow.assets', 'quill.snow.css') }}">
+    <script src="{{ route('workflow.assets', 'quill.js') }}"></script>
+    <script defer src="{{ route('workflow.assets', 'alpine.min.js') }}"></script>
 </head>
 
 <body class="h-full overflow-hidden bg-background text-foreground antialiased"
-      x-data="app()" x-init="boot()">
+      x-data="app()" x-init="boot()" @keydown.escape.window="if(modal)modal=null">
 
     {{-- Hidden file input for circuit import --}}
     <input type="file" accept=".json" x-ref="importInput" class="hidden" @change="importCircuit($event)">
@@ -176,6 +86,9 @@
 
         /** @type {number} Speed of the animation (lower = slower) */
         const ANIM_SPEED = 0.004;
+
+        /** @type {boolean} User asked the OS to reduce motion — skip the animated flow dots */
+        const PREFERS_REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
         return {
 
@@ -323,6 +236,13 @@
             /** Messages belonging to the active circuit */
             get circuitMessages() {
                 return this.circuit?.messages || this.baskets.flatMap(b => b.messages || []);
+            },
+
+            /** Actions selectable for the active circuit: transversal ones (no models)
+             *  plus those limited to this circuit's targetModel. */
+            get scopedActions() {
+                const tm = this.circuit?.targetModel;
+                return this.availableActions.filter(a => !a.models?.length || (tm && a.models.includes(tm)));
             },
 
             /** Baskets that can be linked to from the selected basket (excludes self and existing links) */
@@ -587,6 +507,40 @@
             boot() {
                 if (this.circuits.length) {
                     this.selectCircuit(this.circuits[0]);
+                }
+
+                // Pause the 60fps edge-animation loop while the tab is hidden.
+                document.addEventListener('visibilitychange', () => {
+                    document.hidden ? this.stopEdgeAnimation() : this.drawEdges();
+                });
+
+                // Move keyboard focus into a modal when it opens (accessibility).
+                this.$watch('activeModal', (name) => {
+                    if (!name) return;
+                    this.$nextTick(() => {
+                        const panel = document.querySelector('[data-modal="' + name + '"]');
+                        (panel?.querySelector('input,textarea,select') || panel)?.focus();
+                    });
+                });
+            },
+
+            /**
+             * Keep keyboard focus inside the open modal (Tab / Shift+Tab wrap).
+             * param: {KeyboardEvent} event
+             */
+            trapTab(event) {
+                const focusables = event.currentTarget.querySelectorAll(
+                    'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+                );
+                if (!focusables.length) return;
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
                 }
             },
 
@@ -999,6 +953,9 @@
             startEdgeAnimation() {
                 if (this.animationFrameId) return;
 
+                // Reduced-motion: draw the edges once, no continuous rAF loop.
+                if (PREFERS_REDUCED_MOTION) { this.renderAllEdges(); return; }
+
                 const loop = () => {
                     this.animationProgress = (this.animationProgress + ANIM_SPEED) % 1;
                     this.renderAllEdges();
@@ -1130,14 +1087,16 @@
                 ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x2, y2);
                 ctx.stroke();
 
-                // Flowing dots
-                for (let i = 0; i < FLOW_DOT_COUNT; i++) {
-                    const t = (this.animationProgress + i / FLOW_DOT_COUNT) % 1;
-                    const point = this.bezierPoint(x1, y1, cx1, cy1, cx2, cy2, x2, y2, t);
-                    ctx.beginPath();
-                    ctx.fillStyle = isSelected ? colors.flowSelected : colors.flow;
-                    ctx.arc(point.x, point.y, isSelected ? 3.5 : 2.5, 0, Math.PI * 2);
-                    ctx.fill();
+                // Flowing dots (skipped when the user prefers reduced motion)
+                if (!PREFERS_REDUCED_MOTION) {
+                    for (let i = 0; i < FLOW_DOT_COUNT; i++) {
+                        const t = (this.animationProgress + i / FLOW_DOT_COUNT) % 1;
+                        const point = this.bezierPoint(x1, y1, cx1, cy1, cx2, cy2, x2, y2, t);
+                        ctx.beginPath();
+                        ctx.fillStyle = isSelected ? colors.flowSelected : colors.flow;
+                        ctx.arc(point.x, point.y, isSelected ? 3.5 : 2.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
 
                 // Source dot

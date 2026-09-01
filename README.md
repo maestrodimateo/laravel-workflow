@@ -650,7 +650,25 @@ The visual designer at `/workflow/admin` provides:
 - **Export / Import** — JSON + PNG export, JSON import
 - **Zoom** — scroll wheel + controls
 - **Dark mode** — toggle between light and dark themes
-- **No build step** — works out of the box, powered by Alpine.js + Tailwind CDN
+- **No build step** — works out of the box (assets are vendored, see below)
+
+### Front-end assets
+
+The designer's front-end libraries (a **compiled, purged** Tailwind stylesheet,
+Alpine.js and Quill) are vendored under `resources/dist/` and served
+**same-origin** by the package at `/workflow/assets/{file}`. There is **no CDN**:
+the UI works offline / air-gapped and under a strict Content-Security-Policy, and
+nothing external is loaded (so Subresource Integrity is not applicable).
+
+Only maintainers editing the Blade views need Node — regenerate the stylesheet
+after any markup change:
+
+```bash
+npx tailwindcss@3 -c tailwind.config.js -i resources/css/input.css -o resources/dist/app.css --minify
+```
+
+The committed `resources/dist/app.css` is the shipped artifact; consumers never
+run a build.
 
 ---
 

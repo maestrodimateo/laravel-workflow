@@ -4,9 +4,10 @@
 <template x-teleport="body">
 <div x-show="modal==='circuit'" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" x-transition.opacity>
     <div class="fixed inset-0 bg-black/50" @click="modal=null"></div>
-    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4 relative z-10 fade-in">
+    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4 relative z-10 fade-in"
+         role="dialog" aria-modal="true" aria-labelledby="wf-circuit-title" data-modal="circuit" tabindex="-1" @keydown.tab="trapTab($event)">
         <div class="px-6 py-4 border-b border-border">
-            <h3 class="text-base font-semibold text-foreground" x-text="editId ? '{{ __('workflow::workflow.ui.circuit_modal.edit_title') }}' : '{{ __('workflow::workflow.ui.circuit_modal.new_title') }}'"></h3>
+            <h3 id="wf-circuit-title" class="text-base font-semibold text-foreground" x-text="editId ? '{{ __('workflow::workflow.ui.circuit_modal.edit_title') }}' : '{{ __('workflow::workflow.ui.circuit_modal.new_title') }}'"></h3>
             <p class="text-xs text-muted-foreground mt-0.5">{{ __('workflow::workflow.ui.circuit_modal.subtitle') }}</p>
         </div>
         <form @submit.prevent="saveCircuit()" class="p-6 space-y-4">

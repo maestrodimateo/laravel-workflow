@@ -4,9 +4,10 @@
 <template x-teleport="body">
 <div x-show="modal==='basket'" x-cloak class="fixed inset-0 z-50 flex items-center justify-center" x-transition.opacity>
     <div class="fixed inset-0 bg-black/50" @click="modal=null"></div>
-    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-2xl mx-4 relative z-10 fade-in">
+    <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-2xl mx-4 relative z-10 fade-in"
+         role="dialog" aria-modal="true" aria-labelledby="wf-basket-title" data-modal="basket" tabindex="-1" @keydown.tab="trapTab($event)">
         <div class="px-6 py-4 border-b border-border">
-            <h3 class="text-base font-semibold text-foreground" x-text="editId ? '{{ __('workflow::workflow.ui.basket_modal.edit_title') }}' : '{{ __('workflow::workflow.ui.basket_modal.new_title') }}'"></h3>
+            <h3 id="wf-basket-title" class="text-base font-semibold text-foreground" x-text="editId ? '{{ __('workflow::workflow.ui.basket_modal.edit_title') }}' : '{{ __('workflow::workflow.ui.basket_modal.new_title') }}'"></h3>
             <p class="text-xs text-muted-foreground mt-0.5">{{ __('workflow::workflow.ui.basket_modal.subtitle') }}</p>
         </div>
         <form @submit.prevent="saveBasket()" class="p-6 space-y-4">
@@ -28,7 +29,7 @@
                     <template x-for="c in colors" :key="c.value">
                         <button type="button" @click="bForm.color=c.value"
                                 :class="bForm.color === c.value ? 'ring-2 ring-ring ring-offset-2 ring-offset-card scale-110' : ''"
-                                class="w-7 h-7 rounded-md transition-all hover:scale-110"
+                                class="w-7 h-7 rounded-md transition-transform hover:scale-110"
                                 :style="'background:' + c.value" :title="c.name"></button>
                     </template>
                 </div>

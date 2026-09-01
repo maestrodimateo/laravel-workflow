@@ -1,7 +1,7 @@
 {{-- ============================================================
      BASKET NODE — Single basket card on the canvas
      ============================================================ --}}
-<div class="rounded-lg border bg-card shadow-sm overflow-hidden relative group transition-all"
+<div class="rounded-lg border bg-card shadow-sm overflow-hidden relative group transition-[box-shadow,border-color]"
      :class="{
          'border-ring shadow-md ring-1 ring-ring': sel?.id === b.id,
          'border-border hover:shadow-md': sel?.id !== b.id,
@@ -20,10 +20,10 @@
                   :style="'background:' + color(b.color) + '12; color:' + color(b.color) + '; border-color:' + color(b.color) + '30'"
                   x-text="b.status"></span>
             <div class="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button @click.stop="editBasket(b)" class="sh-btn sh-btn-ghost h-6 w-6 p-0">
+                <button @click.stop="editBasket(b)" class="sh-btn sh-btn-ghost h-6 w-6 p-0" :aria-label="'{{ __('workflow::workflow.ui.header.edit') }} ' + b.name">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                 </button>
-                <button x-show="b.status !== 'DRAFT'" @click.stop="deleteBasket(b)" class="sh-btn sh-btn-ghost h-6 w-6 p-0 hover:!text-destructive">
+                <button x-show="b.status !== 'DRAFT'" @click.stop="deleteBasket(b)" class="sh-btn sh-btn-ghost h-6 w-6 p-0 hover:!text-destructive" :aria-label="'{{ __('workflow::workflow.ui.header.delete') }} ' + b.name">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -62,7 +62,7 @@
         {{-- Hit area --}}
         <div class="w-6 h-6 rounded-full absolute -inset-1.5"></div>
         {{-- Visible dot --}}
-        <div class="w-4 h-4 rounded-full border-2 border-card shadow transition-all"
+        <div class="w-4 h-4 rounded-full border-2 border-card shadow transition-[background-color,transform,box-shadow]"
              :class="linking && linking.id !== b.id
                  ? 'bg-green-500 scale-125 ring-4 ring-green-500/20'
                  : 'bg-muted-foreground/30'"></div>

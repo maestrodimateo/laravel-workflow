@@ -2,14 +2,18 @@
 
 namespace Maestrodimateo\Workflow;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Maestrodimateo\Workflow\Actions\LogTransitionAction;
+use Maestrodimateo\Workflow\Controllers\AssetController;
 use Maestrodimateo\Workflow\Actions\RequireDocumentAction;
 use Maestrodimateo\Workflow\Actions\SendEmailAction;
 use Maestrodimateo\Workflow\Actions\WebhookAction;
 use Maestrodimateo\Workflow\Console\MakeTransitionActionCommand;
+use Maestrodimateo\Workflow\Events\TransitionEvent;
+use Maestrodimateo\Workflow\Listeners\HistoryListener;
 
 class WorkflowServiceProvider extends ServiceProvider
 {
@@ -18,14 +22,13 @@ class WorkflowServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/workflow.php', 'workflow');
 
         $this->app->singleton(WorkflowManager::class, fn () => new WorkflowManager);
-
-        $this->app->register(WorkflowEventServiceProvider::class);
     }
 
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'workflow');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'workflow');
+        Event::listen(TransitionEvent::class, HistoryListener::class);
         $this->registerAuthorization();
         $this->loadRoutes();
         $this->registerBuiltInActions();
@@ -81,6 +84,12 @@ class WorkflowServiceProvider extends ServiceProvider
     private function loadRoutes(): void
     {
         $prefix = config('workflow.routes.prefix', 'workflow');
+
+        // Vendored front-end assets — public and same-origin (no auth gate),
+        // so the login page's own designer chrome can load them too.
+        Route::get($prefix.'/assets/{file}', AssetController::class)
+            ->where('file', '[A-Za-z0-9._-]+')
+            ->name('workflow.assets');
 
         // Authorization gate applied on top of every workflow route.
         $ability = config('workflow.authorization.gate');
