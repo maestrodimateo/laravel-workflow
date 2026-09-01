@@ -31,8 +31,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Maestrodimateo\\Workflow\\WorkflowServiceProvider",
-                "Maestrodimateo\\Workflow\\WorkflowEventServiceProvider"
+                "Maestrodimateo\\Workflow\\WorkflowServiceProvider"
             ],
             "aliases": {
                 "Workflow": "Maestrodimateo\\Workflow\\Facades\\Workflow"
