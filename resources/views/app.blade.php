@@ -1570,8 +1570,13 @@
                     recipient: this.recipients[0]?.value || 'subject',
                     circuit_id: this.circuit.id,
                 };
-                this.quillEditor = null;
                 this.activeModal = 'msg';
+                // The Quill instance is created once (x-init runs once under x-show),
+                // so reuse it and just clear its content. Nulling it here would leave
+                // quillEditor null on reopen and break variable insertion.
+                this.$nextTick(() => {
+                    this.quillEditor ? this.quillEditor.setText('') : this.initQuill(this.$refs.quillEditor);
+                });
             },
 
             async saveMsg() {
