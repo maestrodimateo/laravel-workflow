@@ -25,6 +25,20 @@ class {{ class }} implements TransitionAction
     }
 
     /**
+     * Limit this action to circuits targeting these models (transversal by default).
+     *
+     * Remove this method (or return []) to make the action available in every
+     * workflow. Return one or more model FQCNs to only expose it on circuits
+     * whose targetModel matches.
+     *
+     * @return array<int, class-string>
+     */
+    // public static function models(): array
+    // {
+    //     return [\App\Models\YourModel::class];
+    // }
+
+    /**
      * Execute the action during a transition.
      *
      * @param  Model  $model   The model being transitioned

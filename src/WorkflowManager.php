@@ -46,6 +46,35 @@ class WorkflowManager
         return static::$actions;
     }
 
+    /**
+     * Target-model classes an action is limited to.
+     *
+     * An action is transversal (available in every circuit) by default. To
+     * limit it to specific workflows, declare an optional static
+     * `models(): array` returning the circuit target-model FQCNs it applies to.
+     * An empty array (or no method) means transversal.
+     *
+     * @param  class-string<TransitionAction>  $actionClass
+     * @return array<int, class-string>
+     */
+    public static function actionModels(string $actionClass): array
+    {
+        return method_exists($actionClass, 'models') ? array_values($actionClass::models()) : [];
+    }
+
+    /**
+     * Whether an action is available for a circuit's target model.
+     * Transversal actions (no/empty models()) are always available.
+     *
+     * @param  class-string<TransitionAction>  $actionClass
+     */
+    public static function actionAllowsModel(string $actionClass, ?string $targetModel): bool
+    {
+        $models = static::actionModels($actionClass);
+
+        return $models === [] || ($targetModel !== null && in_array($targetModel, $models, true));
+    }
+
     // -------------------------------------------------------------------------
     // Model & circuit binding
     // -------------------------------------------------------------------------

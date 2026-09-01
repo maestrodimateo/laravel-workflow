@@ -157,3 +157,44 @@ it('sends a transition email to the resolved recipient with substituted variable
             && $mail->resolvedSubject === 'Moved to REVIEW';
     });
 });
+
+// ---------------------------------------------------------------------------
+// Action scoping (transversal vs limited to a workflow's targetModel)
+// ---------------------------------------------------------------------------
+
+/** Action limited to circuits targeting the Document model. */
+class DocOnlyAction implements TransitionAction
+{
+    public static function key(): string
+    {
+        return 'doc_only';
+    }
+
+    public static function label(): string
+    {
+        return 'Doc only';
+    }
+
+    public static function models(): array
+    {
+        return [Document::class];
+    }
+
+    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    {
+        //
+    }
+}
+
+it('treats actions without models() as transversal', function () {
+    // BoomAction declares no models() -> available for any target model.
+    expect(WorkflowManager::actionModels(BoomAction::class))->toBe([])
+        ->and(WorkflowManager::actionAllowsModel(BoomAction::class, Test::class))->toBeTrue()
+        ->and(WorkflowManager::actionAllowsModel(BoomAction::class, null))->toBeTrue();
+});
+
+it('limits a scoped action to its declared target models', function () {
+    expect(WorkflowManager::actionAllowsModel(DocOnlyAction::class, Document::class))->toBeTrue()
+        ->and(WorkflowManager::actionAllowsModel(DocOnlyAction::class, Test::class))->toBeFalse()
+        ->and(WorkflowManager::actionAllowsModel(DocOnlyAction::class, null))->toBeFalse();
+});

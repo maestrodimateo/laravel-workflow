@@ -14,12 +14,17 @@ use Maestrodimateo\Workflow\Services\MessageVariableResolver;
 use Maestrodimateo\Workflow\WorkflowManager;
 use Throwable;
 
-class WorkflowAdminController extends Controller
+class WorkflowAdminController
 {
     public function __invoke(): View
     {
         $actions = collect(WorkflowManager::getRegisteredActions())
-            ->map(fn ($class, $key) => ['key' => $key, 'label' => $class::label()])
+            ->map(fn ($class, $key) => [
+                'key' => $key,
+                'label' => $class::label(),
+                // Target models this action is limited to; empty = transversal.
+                'models' => WorkflowManager::actionModels($class),
+            ])
             ->values();
 
         return view('workflow::app', [
@@ -56,6 +61,21 @@ class WorkflowAdminController extends Controller
             'actions.*.type' => ['required', 'string'],
             'actions.*.config' => ['nullable', 'array'],
         ]);
+
+        // Reject actions limited to another workflow: a scoped action may only
+        // be attached to a transition whose circuit targets its declared model.
+        $targetModel = $from->circuit->targetModel;
+        $registered = WorkflowManager::getRegisteredActions();
+
+        foreach ($data['actions'] ?? [] as $action) {
+            $class = $registered[$action['type']] ?? null;
+
+            abort_if(
+                $class !== null && ! WorkflowManager::actionAllowsModel($class, $targetModel),
+                422,
+                "Action [{$action['type']}] is not available for this workflow.",
+            );
+        }
 
         $from->next()->updateExistingPivot($to->id, [
             'label' => $data['label'] ?? null,
