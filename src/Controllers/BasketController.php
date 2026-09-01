@@ -3,26 +3,32 @@
 namespace Maestrodimateo\Workflow\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Requests\BasketRequest;
 use Maestrodimateo\Workflow\Resources\BasketResource;
-use Maestrodimateo\Workflow\Services\BasketService;
 use Symfony\Component\HttpFoundation\Response;
 
-class BasketController extends Controller
+class BasketController
 {
-    public function __construct(private readonly BasketService $basketService) {}
-
     public function store(BasketRequest $request): JsonResponse
     {
-        $basket = $this->basketService->create($request);
+        $basket = DB::transaction(function () use ($request) {
+            $basket = Basket::create($request->validated());
+            $basket->previous()->syncWithoutDetaching($request->input('previous', []));
+
+            return $basket;
+        });
 
         return response()->json(['basket' => BasketResource::make($basket)], Response::HTTP_CREATED);
     }
 
     public function update(BasketRequest $request, Basket $basket): BasketResource
     {
-        $this->basketService->update($request, $basket);
+        DB::transaction(function () use ($basket, $request) {
+            $basket->update($request->validated());
+            $basket->previous()->sync($request->input('previous', []));
+        });
 
         return BasketResource::make($basket->refresh());
     }

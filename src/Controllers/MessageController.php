@@ -9,7 +9,7 @@ use Maestrodimateo\Workflow\Requests\MessageRequest;
 use Maestrodimateo\Workflow\Resources\MessageResource;
 use Symfony\Component\HttpFoundation\Response;
 
-class MessageController extends Controller
+class MessageController
 {
     public function store(MessageRequest $request, Circuit $circuit): JsonResponse
     {

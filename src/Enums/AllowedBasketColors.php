@@ -2,12 +2,8 @@
 
 namespace Maestrodimateo\Workflow\Enums;
 
-use Maestrodimateo\Workflow\Traits\CasesManipulation;
-
 enum AllowedBasketColors: string
 {
-    use CasesManipulation;
-
     case SLATE = '#64748b';
     case STONE = '#78716c';
     case RED = '#e11d48';

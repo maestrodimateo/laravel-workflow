@@ -9,7 +9,7 @@ use Maestrodimateo\Workflow\Requests\CircuitRequest;
 use Maestrodimateo\Workflow\Resources\CircuitResource;
 use Symfony\Component\HttpFoundation\Response;
 
-class CircuitController extends Controller
+class CircuitController
 {
     public function index(): AnonymousResourceCollection
     {
