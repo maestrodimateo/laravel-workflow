@@ -3,3 +3,7 @@
 /.phpunit.cache
 ARCHITECTURE.md
 .DS_Store
+
+# JS dev harness (headless UI smoke test)
+/node_modules
+package-lock.json
