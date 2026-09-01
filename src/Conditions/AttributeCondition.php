@@ -45,13 +45,24 @@ class AttributeCondition implements TransitionCondition
             '<=' => $actual <= $expected,
             '>' => $actual > $expected,
             '>=' => $actual >= $expected,
-            'in' => in_array($actual, (array) $expected, false),
-            'not_in' => ! in_array($actual, (array) $expected, false),
+            'in' => in_array($actual, $this->list($expected), false),
+            'not_in' => ! in_array($actual, $this->list($expected), false),
             'empty' => empty($actual),
             'not_empty' => ! empty($actual),
             'contains' => is_string($actual) && str_contains($actual, (string) $expected),
             default => true,
         };
+    }
+
+    /**
+     * Normalise an "in"/"not_in" value to a list: an array stays as-is, a
+     * string is split on commas (so the designer's single text input works).
+     *
+     * @return array<int, mixed>
+     */
+    private function list(mixed $value): array
+    {
+        return is_array($value) ? $value : array_map('trim', explode(',', (string) $value));
     }
 
     public function reason(array $config = []): string

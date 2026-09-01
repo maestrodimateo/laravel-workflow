@@ -94,7 +94,7 @@ return [
     |
     | Example:
     | 'conditions' => [
-    |     App\Workflow\Conditions\BudgetApprovedCondition::class,
+    | App\Workflow\Conditions\BudgetApprovedCondition::class,
     | ],
     */
     'conditions' => [],

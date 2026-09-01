@@ -27,12 +27,21 @@ class WorkflowAdminController
             ])
             ->values();
 
+        $conditions = collect(WorkflowManager::getRegisteredConditions())
+            ->map(fn ($class, $key) => [
+                'key' => $key,
+                'label' => $class::label(),
+                'models' => WorkflowManager::actionModels($class),
+            ])
+            ->values();
+
         return view('workflow::app', [
             'circuits' => Circuit::with('baskets.next', 'baskets.previous', 'baskets.messages', 'messages')->get(),
             'colors' => collect(AllowedBasketColors::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
             'msgTypes' => collect(MessageType::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
             'recipients' => collect(RecipientType::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
             'actions' => $actions,
+            'conditions' => $conditions,
             'variables' => MessageVariableResolver::availableKeys(),
             'apiPrefix' => './admin/api',
         ]);
@@ -88,12 +97,16 @@ class WorkflowAdminController
             'actions' => ['nullable', 'array'],
             'actions.*.type' => ['required', 'string'],
             'actions.*.config' => ['nullable', 'array'],
+            'conditions' => ['nullable', 'array'],
+            'conditions.*.type' => ['required', 'string'],
+            'conditions.*.config' => ['nullable', 'array'],
         ]);
 
-        // Reject actions limited to another workflow: a scoped action may only
-        // be attached to a transition whose circuit targets its declared model.
+        // Reject actions/conditions limited to another workflow: a scoped item may
+        // only be attached to a transition whose circuit targets its declared model.
         $targetModel = $from->circuit->targetModel;
         $registered = WorkflowManager::getRegisteredActions();
+        $registeredConditions = WorkflowManager::getRegisteredConditions();
 
         foreach ($data['actions'] ?? [] as $action) {
             $class = $registered[$action['type']] ?? null;
@@ -105,9 +118,20 @@ class WorkflowAdminController
             );
         }
 
+        foreach ($data['conditions'] ?? [] as $condition) {
+            $class = $registeredConditions[$condition['type']] ?? null;
+
+            abort_if(
+                $class !== null && ! WorkflowManager::actionAllowsModel($class, $targetModel),
+                422,
+                "Condition [{$condition['type']}] is not available for this workflow.",
+            );
+        }
+
         $from->next()->updateExistingPivot($to->id, [
             'label' => $data['label'] ?? null,
             'actions' => json_encode($data['actions'] ?? []),
+            'conditions' => json_encode($data['conditions'] ?? []),
         ]);
 
         return response()->json(['ok' => true]);

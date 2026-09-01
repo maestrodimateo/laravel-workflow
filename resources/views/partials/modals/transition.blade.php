@@ -84,6 +84,61 @@
                 </div>
                 <p x-show="!tConfig.actions.length" class="text-xs text-muted-foreground">{{ __('workflow::workflow.ui.transition_modal.no_actions') }}</p>
             </div>
+
+            {{-- Conditions (guards) — gate the transition on the model's state --}}
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-sm font-medium text-foreground">{{ __('workflow::workflow.ui.transition_modal.conditions') }}</label>
+                    <div class="relative" x-data="{condOpen: false}">
+                        <button @click="condOpen=!condOpen" class="sh-btn sh-btn-outline h-7 text-xs px-2">
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            {{ __('workflow::workflow.ui.transition_modal.add_condition') }}
+                        </button>
+                        <div x-show="condOpen" @click.away="condOpen=false" x-cloak
+                             class="absolute right-0 top-full mt-1 w-48 bg-card rounded-md border border-border shadow-md py-1 z-50">
+                            <template x-for="c in scopedConditions" :key="c.key">
+                                <button @click="addTransitionCondition(c.key);condOpen=false"
+                                        class="w-full text-left px-3 py-1.5 text-sm hover:bg-accent text-foreground" x-text="c.label"></button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-2" x-show="tConfig.conditions.length">
+                    <template x-for="(condition, i) in tConfig.conditions" :key="i">
+                        <div class="bg-muted rounded-md px-4 py-3 border border-border">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-semibold text-foreground" x-text="conditionLabel(condition.type)"></span>
+                                <button @click="tConfig.conditions.splice(i,1)" class="sh-btn sh-btn-ghost h-6 w-6 p-0 hover:!text-destructive">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+                            {{-- Declarative attribute condition: field / operator / value --}}
+                            <template x-if="condition.type === 'attribute'">
+                                <div x-init="if(!condition.config.op) condition.config.op='='" class="flex items-center gap-2">
+                                    <input x-model="condition.config.field" class="sh-input h-7 text-xs flex-[2]" placeholder="{{ __('workflow::workflow.ui.transition_modal.condition_field_placeholder') }}">
+                                    <select x-model="condition.config.op" class="sh-input h-7 text-xs flex-1">
+                                        <option value="=">=</option>
+                                        <option value="!=">&ne;</option>
+                                        <option value="<">&lt;</option>
+                                        <option value="<=">&le;</option>
+                                        <option value=">">&gt;</option>
+                                        <option value=">=">&ge;</option>
+                                        <option value="in">in</option>
+                                        <option value="not_in">not in</option>
+                                        <option value="empty">empty</option>
+                                        <option value="not_empty">not empty</option>
+                                        <option value="contains">contains</option>
+                                    </select>
+                                    <input x-model="condition.config.value" x-show="!['empty','not_empty'].includes(condition.config.op)"
+                                           class="sh-input h-7 text-xs flex-[2]" placeholder="{{ __('workflow::workflow.ui.transition_modal.condition_value_placeholder') }}">
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+                <p x-show="!tConfig.conditions.length" class="text-xs text-muted-foreground">{{ __('workflow::workflow.ui.transition_modal.no_conditions') }}</p>
+            </div>
         </div>
 
         <div class="flex justify-end gap-2 px-6 py-4 border-t border-border shrink-0">

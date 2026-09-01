@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Maestrodimateo\Workflow\Conditions\AttributeCondition;
+use Maestrodimateo\Workflow\Controllers\WorkflowAdminController;
 use Maestrodimateo\Workflow\Contracts\TransitionCondition;
 use Maestrodimateo\Workflow\Exceptions\TransitionConditionException;
 use Maestrodimateo\Workflow\Facades\Workflow;
@@ -60,6 +62,8 @@ it('evaluates the attribute operators', function () {
         ->and($c->passes($m, ['field' => 'name', 'op' => '!=', 'value' => 'hello']))->toBeFalse()
         ->and($c->passes($m, ['field' => 'name', 'op' => '>=', 'value' => 'a']))->toBeTrue()
         ->and($c->passes($m, ['field' => 'name', 'op' => 'in', 'value' => ['a', 'hello']]))->toBeTrue()
+        ->and($c->passes($m, ['field' => 'name', 'op' => 'in', 'value' => 'a, hello']))->toBeTrue() // comma string
+        ->and($c->passes($m, ['field' => 'name', 'op' => 'in', 'value' => 'a, b']))->toBeFalse()
         ->and($c->passes($m, ['field' => 'name', 'op' => 'not_in', 'value' => ['a', 'b']]))->toBeTrue()
         ->and($c->passes($m, ['field' => 'name', 'op' => 'contains', 'value' => 'ell']))->toBeTrue()
         ->and($c->passes($m, ['field' => 'name', 'op' => 'not_empty']))->toBeTrue()
@@ -120,3 +124,28 @@ it('reports availability and reasons via availableTransitions', function () {
     expect($open[0]['open'])->toBeTrue()
         ->and($open[0]['blockedBy'])->toBeEmpty();
 });
+
+// ---------------------------------------------------------------------------
+// Designer wiring — WorkflowAdminController@updateTransition persists conditions
+// ---------------------------------------------------------------------------
+
+it('persists conditions configured through the admin transition editor', function () {
+    $circuit = Circuit::create(['name' => 'C', 'targetModel' => Test::class]);
+    $draft = $circuit->baskets()->first();
+    $done = $circuit->baskets()->create(['name' => 'Done', 'status' => 'DONE', 'color' => '#059669']);
+    $draft->next()->attach($done->id);
+
+    $request = Request::create('/', 'PUT', [
+        'label' => 'Approve',
+        'conditions' => [
+            ['type' => 'attribute', 'config' => ['field' => 'name', 'op' => '=', 'value' => 'OK']],
+        ],
+    ]);
+    (new WorkflowAdminController)->updateTransition($request, $draft->fresh(), $done->fresh());
+
+    // The saved condition now guards real transitions.
+    expect(fn () => Workflow::for(Test::create(['name' => 'NO']))->transition($done->id))
+        ->toThrow(TransitionConditionException::class);
+    expect(Workflow::for(Test::create(['name' => 'OK']))->transition($done->id))->toBeTrue();
+});
+

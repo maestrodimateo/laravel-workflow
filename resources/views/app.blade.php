@@ -117,6 +117,9 @@
             /** @type {Array} Registered transition actions */
             availableActions: @json($actions),
 
+            /** @type {Array} Registered transition conditions (guards) */
+            availableConditions: @json($conditions),
+
             /** @type {boolean} Dark mode active */
             dark: localStorage.getItem('wf-dark') === '1'
                 || (!localStorage.getItem('wf-dark') && window.matchMedia('(prefers-color-scheme:dark)').matches),
@@ -223,7 +226,7 @@
             quillEditor: null,
 
             /** @type {Object} Transition config form data */
-            transitionConfig: { from: null, to: null, label: '', actions: [] },
+            transitionConfig: { from: null, to: null, label: '', actions: [], conditions: [] },
 
             /** @type {string} Selected basket ID for adding a link from the sidebar dropdown */
             sidebarLinkTarget: '',
@@ -252,6 +255,12 @@
             get scopedActions() {
                 const tm = this.circuit?.targetModel;
                 return this.availableActions.filter(a => !a.models?.length || (tm && a.models.includes(tm)));
+            },
+
+            /** Conditions selectable for the active circuit (transversal + model-scoped). */
+            get scopedConditions() {
+                const tm = this.circuit?.targetModel;
+                return this.availableConditions.filter(c => !c.models?.length || (tm && c.models.includes(tm)));
             },
 
             /** Baskets that can be linked to from the selected basket (excludes self and existing links) */
@@ -337,6 +346,15 @@
                 return this.availableActions.find(a => a.key === actionKey)?.label || actionKey;
             },
 
+            /**
+             * Get the human-readable label for a transition condition key.
+             * param: {string} conditionKey
+             * returns: {string}
+             */
+            getConditionLabel(conditionKey) {
+                return this.availableConditions.find(c => c.key === conditionKey)?.label || conditionKey;
+            },
+
             // =================================================================
             // Backward-compatible aliases (used in Blade templates)
             // =================================================================
@@ -396,6 +414,7 @@
             notify(msg, ok = true) { this.showToast(msg, ok); },
             parseActions(v) { return this.parseActionsJson(v); },
             actionLabel(k) { return this.getActionLabel(k); },
+            conditionLabel(k) { return this.getConditionLabel(k); },
 
             // =================================================================
             // API client
@@ -1615,6 +1634,7 @@
                     to: toBasket,
                     label: pivot.label || '',
                     actions: this.parseActionsJson(pivot.actions),
+                    conditions: this.parseActionsJson(pivot.conditions),
                 };
                 this.activeModal = 'transition';
             },
@@ -1627,14 +1647,23 @@
                 this.transitionConfig.actions.push({ type: actionKey, config: {} });
             },
 
+            /**
+             * Add a new condition (guard) to the transition config.
+             * param: {string} conditionKey
+             */
+            addTransitionCondition(conditionKey) {
+                this.transitionConfig.conditions.push({ type: conditionKey, config: {} });
+            },
+
             /** Save the transition config (label + actions) to the API */
             async saveTransitionConfig() {
                 this.isLoading = true;
                 try {
-                    const { from, to, label, actions } = this.transitionConfig;
+                    const { from, to, label, actions, conditions } = this.transitionConfig;
                     await this.api('PUT', '/transitions/' + from.id + '/' + to.id, {
                         label: label || null,
                         actions,
+                        conditions,
                     });
                     this.activeModal = null;
                     await this.refreshBaskets();
