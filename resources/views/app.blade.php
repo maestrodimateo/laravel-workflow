@@ -17,7 +17,10 @@
 </head>
 
 <body class="h-full overflow-hidden bg-background text-foreground antialiased"
-      x-data="app()" x-init="boot()" @keydown.escape.window="if(modal)modal=null">
+      x-data="app()" x-init="boot()"
+      @keydown.escape.window="if(modal)modal=null"
+      @keydown.delete.window="onDeleteSelected($event)"
+      @keydown.backspace.window="onDeleteSelected($event)">
 
     {{-- Hidden file input for circuit import --}}
     <input type="file" accept=".json" x-ref="importInput" class="hidden" @change="importCircuit($event)">
@@ -196,6 +199,12 @@
 
             /** @type {number} Current zoom level (0.3 to 2.0) */
             zoomLevel: 1,
+
+            /** @type {boolean} Whether the canvas background is being panned */
+            panning: false,
+
+            /** @type {Object} Scroll + mouse origin captured when a pan starts */
+            panStart: { x: 0, y: 0, left: 0, top: 0 },
 
             // =================================================================
             // Form state
@@ -553,12 +562,26 @@
                 this.circuit = circuitData;
                 this.selectedBasket = null;
                 this.linkSource = null;
-                this.nodePositions = {};
+                this.seedSavedPositions();
 
                 this.$nextTick(() => {
-                    this.computeLayout(true);
+                    // Auto-layout (with fit-zoom) only when nothing was saved yet;
+                    // otherwise keep the saved arrangement and place just the gaps.
+                    this.computeLayout(Object.keys(this.nodePositions).length === 0);
                     this.$nextTick(() => this.drawEdges());
                 });
+            },
+
+            /** Seed node positions from each basket's saved {x,y} (shared per circuit). */
+            seedSavedPositions() {
+                const seeded = {};
+                for (const b of this.baskets) {
+                    const p = b.position;
+                    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+                        seeded[b.id] = { x: p.x, y: p.y };
+                    }
+                }
+                this.nodePositions = seeded;
             },
 
             // Alias used in templates
@@ -678,8 +701,29 @@
             /** Alias for template */
             layout(force) { this.computeLayout(force); },
 
-            /** Reset all positions and recompute */
-            autoLayout() { this.computeLayout(true); },
+            /** Reset all positions, recompute, and persist the new arrangement. */
+            autoLayout() {
+                this.computeLayout(true);
+                this.savePositions({ ...this.nodePositions });
+            },
+
+            /**
+             * Persist basket canvas positions to the server (shared per circuit).
+             * param: {Object} positions - Map of basketId -> { x, y }
+             */
+            async savePositions(positions) {
+                if (!this.circuit || !Object.keys(positions).length) return;
+                try {
+                    await this.api('PATCH', '/circuits/' + this.circuit.id + '/positions', { positions });
+                    // Keep local models in sync so a later refresh preserves them.
+                    for (const [id, p] of Object.entries(positions)) {
+                        const b = this.baskets.find(bb => bb.id === id);
+                        if (b) b.position = p;
+                    }
+                } catch (error) {
+                    this.showToast(error.message, false);
+                }
+            },
 
             /** Update canvas dimensions to fit all nodes */
             updateCanvasSize() {
@@ -748,6 +792,14 @@
              */
             onMove(event) {
                 const canvas = this.$refs.canvas;
+
+                // Panning the background: scroll the canvas by the mouse delta.
+                if (this.panning) {
+                    canvas.scrollLeft = this.panStart.left - (event.clientX - this.panStart.x);
+                    canvas.scrollTop = this.panStart.top - (event.clientY - this.panStart.y);
+                    return;
+                }
+
                 const rect = this.cachedCanvasRect || canvas.getBoundingClientRect();
 
                 this.mouseX = (event.clientX - rect.left + canvas.scrollLeft) / this.zoomLevel;
@@ -780,20 +832,51 @@
              * Commits the drag position with grid snapping.
              */
             onUp() {
+                if (this.panning) {
+                    this.panning = false;
+                    if (this.$refs.canvas) this.$refs.canvas.style.cursor = '';
+                    return;
+                }
+
                 if (this.draggedNodeId) {
                     // Snap to grid on drop
                     const snappedX = Math.round(this.dragLiveX / GRID_SIZE) * GRID_SIZE;
                     const snappedY = Math.round(this.dragLiveY / GRID_SIZE) * GRID_SIZE;
+                    const movedId = this.draggedNodeId;
 
                     this.nodePositions = {
                         ...this.nodePositions,
-                        [this.draggedNodeId]: { x: snappedX, y: snappedY },
+                        [movedId]: { x: snappedX, y: snappedY },
                     };
 
                     this.draggedNodeId = null;
                     this.cachedCanvasRect = null;
                     this.updateCanvasSize();
+
+                    // Persist only if the node actually moved (not a bare click).
+                    if (this.hasDragged) {
+                        this.savePositions({ [movedId]: { x: snappedX, y: snappedY } });
+                    }
                 }
+            },
+
+            /**
+             * Start panning when the empty canvas background is pressed. Node and
+             * port mousedowns set draggedNodeId / linkSource (or stop propagation)
+             * first, so this only fires on a true background drag.
+             * param: {MouseEvent} event
+             */
+            onCanvasMouseDown(event) {
+                if (this.draggedNodeId || this.linkSource) return;
+                const canvas = this.$refs.canvas;
+                this.panning = true;
+                this.panStart = {
+                    x: event.clientX,
+                    y: event.clientY,
+                    left: canvas.scrollLeft,
+                    top: canvas.scrollTop,
+                };
+                canvas.style.cursor = 'grabbing';
             },
 
             // =================================================================
@@ -1440,6 +1523,21 @@
                 } catch (error) {
                     this.showToast(error.message, false);
                 }
+            },
+
+            /**
+             * Delete the selected basket on Delete/Backspace — but only outside
+             * any input, textarea, Quill editor or open modal, so typing is safe.
+             * param: {KeyboardEvent} event
+             */
+            onDeleteSelected(event) {
+                const el = document.activeElement;
+                const tag = (el?.tagName || '').toLowerCase();
+                if (tag === 'input' || tag === 'textarea' || el?.isContentEditable) return;
+                if (this.activeModal || !this.selectedBasket) return;
+                if (this.selectedBasket.status === 'DRAFT') return; // DRAFT is not deletable
+                event.preventDefault();
+                this.deleteBasket(this.selectedBasket);
             },
 
             // =================================================================

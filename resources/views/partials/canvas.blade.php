@@ -2,12 +2,13 @@
      DIAGRAM CANVAS — Nodes, edges, drag & drop, linking
      ============================================================ --}}
 <div class="flex-1 overflow-auto relative" x-ref="canvas" tabindex="0"
+     @mousedown="onCanvasMouseDown($event)"
      @mousemove="onMove($event)"
      @mouseup="onUp()"
      @mouseleave="mouseInCanvas=false;onUp()"
      @click.self="sel=null;linking=null;$nextTick(()=>drawEdges())"
      @keydown.escape.window="if(linking){linking=null;drawEdges()}"
-     :class="linking ? 'cursor-crosshair' : ''"
+     :class="linking ? 'cursor-crosshair' : 'cursor-grab'"
      :style="dark
          ? 'background-image:radial-gradient(hsl(240 3.7% 15.9%) 1px,transparent 1px);background-size:24px 24px;background-color:hsl(240 10% 3.9%)'
          : 'background-image:radial-gradient(hsl(240 5.9% 90%) 1px,transparent 1px);background-size:24px 24px;background-color:hsl(0 0% 98%)'">

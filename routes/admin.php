@@ -22,6 +22,9 @@ Route::prefix('api')->name('workflow.admin.')->group(function (): void {
         // Admin-specific: load all baskets for a circuit with relations (no pagination, no service)
         Route::get('/{circuit}/baskets', [WorkflowAdminController::class, 'baskets'])->name('baskets');
         Route::get('/{circuit}/messages', [WorkflowAdminController::class, 'messages'])->name('messages');
+
+        // Persist basket canvas positions (shared per circuit)
+        Route::patch('/{circuit}/positions', [WorkflowAdminController::class, 'positions'])->name('positions');
     });
 
     // Export / Import

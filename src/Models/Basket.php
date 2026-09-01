@@ -17,6 +17,7 @@ use Maestrodimateo\Workflow\Traits\HasRoles;
  * @property string $status
  * @property string $color
  * @property array $roles
+ * @property array|null $position
  * @property string $circuit_id
  * @property-read Circuit $circuit
  *
@@ -32,6 +33,7 @@ class Basket extends Model
         'status',
         'color',
         'roles',
+        'position',
         'circuit_id',
     ];
 
@@ -43,6 +45,7 @@ class Basket extends Model
 
     protected $casts = [
         'roles' => 'array',
+        'position' => 'array',
     ];
 
     /**

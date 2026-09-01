@@ -50,6 +50,34 @@ class WorkflowAdminController
         return response()->json($circuit->messages()->get());
     }
 
+    /**
+     * Persist the canvas positions of a circuit's baskets (shared per circuit).
+     *
+     * Body: { positions: { "<basketId>": { x: number, y: number }, ... } }.
+     * Only baskets belonging to the given circuit are updated; unknown ids are
+     * ignored so a stale client can never write positions onto another circuit.
+     */
+    public function positions(Request $request, Circuit $circuit): JsonResponse
+    {
+        $data = $request->validate([
+            'positions' => ['required', 'array'],
+            'positions.*.x' => ['required', 'numeric'],
+            'positions.*.y' => ['required', 'numeric'],
+        ]);
+
+        $ownIds = $circuit->baskets()->pluck('id')->all();
+
+        foreach ($data['positions'] as $id => $pos) {
+            if (in_array($id, $ownIds, true)) {
+                Basket::whereKey($id)->update([
+                    'position' => ['x' => (float) $pos['x'], 'y' => (float) $pos['y']],
+                ]);
+            }
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
     public function updateTransition(Request $request, Basket $from, Basket $to): JsonResponse
     {
         // Prevent cross-circuit transitions: both baskets must belong to the same circuit.
