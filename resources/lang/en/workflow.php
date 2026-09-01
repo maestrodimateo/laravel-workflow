@@ -154,6 +154,8 @@ return [
         'circuit_not_found' => 'Circuit not found',
         'basket_not_found' => 'Basket not found',
         'missing_documents' => 'Missing documents: ',
+        'condition_blocked' => 'Transition to ":to" is blocked.',
+        'attribute_not_met' => 'Condition not met: :field :op :value',
     ],
 
     'validation' => [

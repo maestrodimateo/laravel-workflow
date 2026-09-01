@@ -82,6 +82,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Custom Transition Conditions
+    |--------------------------------------------------------------------------
+    | Register your own transition conditions (guards) here. Each entry must be
+    | a fully qualified class implementing TransitionCondition. A condition's
+    | passes() blocks the transition server-side and drives availableTransitions()
+    | in your own UI — it MUST be side-effect free.
+    |
+    | The built-in `attribute` condition (declarative field/op/value) is always
+    | registered; you don't list it here.
+    |
+    | Example:
+    | 'conditions' => [
+    |     App\Workflow\Conditions\BudgetApprovedCondition::class,
+    | ],
+    */
+    'conditions' => [],
+
+    /*
+    |--------------------------------------------------------------------------
     | Queued Actions
     |--------------------------------------------------------------------------
     | Default queue and connection used when an action implements

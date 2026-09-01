@@ -11,6 +11,7 @@ use Maestrodimateo\Workflow\Controllers\AssetController;
 use Maestrodimateo\Workflow\Actions\RequireDocumentAction;
 use Maestrodimateo\Workflow\Actions\SendEmailAction;
 use Maestrodimateo\Workflow\Actions\WebhookAction;
+use Maestrodimateo\Workflow\Conditions\AttributeCondition;
 use Maestrodimateo\Workflow\Console\MakeTransitionActionCommand;
 use Maestrodimateo\Workflow\Events\TransitionEvent;
 use Maestrodimateo\Workflow\Listeners\HistoryListener;
@@ -32,6 +33,7 @@ class WorkflowServiceProvider extends ServiceProvider
         $this->registerAuthorization();
         $this->loadRoutes();
         $this->registerBuiltInActions();
+        $this->registerBuiltInConditions();
 
         if ($this->app->runningInConsole()) {
             $this->commands([MakeTransitionActionCommand::class]);
@@ -63,6 +65,15 @@ class WorkflowServiceProvider extends ServiceProvider
 
         foreach (config('workflow.actions', []) as $actionClass) {
             WorkflowManager::registerAction($actionClass);
+        }
+    }
+
+    private function registerBuiltInConditions(): void
+    {
+        WorkflowManager::registerCondition(AttributeCondition::class);
+
+        foreach (config('workflow.conditions', []) as $conditionClass) {
+            WorkflowManager::registerCondition($conditionClass);
         }
     }
 

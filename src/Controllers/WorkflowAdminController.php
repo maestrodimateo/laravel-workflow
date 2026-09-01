@@ -130,6 +130,7 @@ class WorkflowAdminController
                 '_to_ref' => $n->id,
                 'label' => $n->pivot->label,
                 'actions' => json_decode($n->pivot->actions ?? '[]', true),
+                'conditions' => json_decode($n->pivot->conditions ?? '[]', true),
             ])->values()->all(),
         ]);
 

@@ -64,7 +64,7 @@ class Basket extends Model
     public function next(): BelongsToMany
     {
         return $this->belongsToMany(Basket::class, 'transition', 'from_basket_id', 'to_basket_id')
-            ->withPivot(['label', 'actions'])
+            ->withPivot(['label', 'actions', 'conditions'])
             ->withTimestamps();
     }
 
@@ -74,7 +74,7 @@ class Basket extends Model
     public function previous(): BelongsToMany
     {
         return $this->belongsToMany(Basket::class, 'transition', 'to_basket_id', 'from_basket_id')
-            ->withPivot(['label', 'actions'])
+            ->withPivot(['label', 'actions', 'conditions'])
             ->withTimestamps();
     }
 

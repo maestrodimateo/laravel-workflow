@@ -11,9 +11,11 @@ use Illuminate\Support\Str;
 use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
 use Maestrodimateo\Workflow\Contracts\QueueableAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
+use Maestrodimateo\Workflow\Contracts\TransitionCondition;
 use Maestrodimateo\Workflow\Events\TransitionEvent;
 use Maestrodimateo\Workflow\Exceptions\InvalidTransitionException;
 use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
+use Maestrodimateo\Workflow\Exceptions\TransitionConditionException;
 use Maestrodimateo\Workflow\Jobs\ExecuteTransitionActionJob;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Circuit;
@@ -30,6 +32,9 @@ class WorkflowManager
     /** @var array<string, class-string<TransitionAction>> */
     private static array $actions = [];
 
+    /** @var array<string, class-string<TransitionCondition>> */
+    private static array $conditions = [];
+
     // -------------------------------------------------------------------------
     // Action registry
     // -------------------------------------------------------------------------
@@ -44,6 +49,18 @@ class WorkflowManager
     public static function getRegisteredActions(): array
     {
         return static::$actions;
+    }
+
+    /** @param  class-string<TransitionCondition>  $conditionClass */
+    public static function registerCondition(string $conditionClass): void
+    {
+        static::$conditions[$conditionClass::key()] = $conditionClass;
+    }
+
+    /** @return array<string, class-string<TransitionCondition>> */
+    public static function getRegisteredConditions(): array
+    {
+        return static::$conditions;
     }
 
     /**
@@ -124,6 +141,39 @@ class WorkflowManager
         return $this->currentStatus()?->next()->get() ?? collect();
     }
 
+    /**
+     * List the reachable next baskets and, for each, whether its guarding
+     * conditions currently pass for the bound model — and if not, why.
+     *
+     * Consumers use this to hide or disable transitions in their own UI.
+     * Conditions are evaluated read-only (see {@see TransitionCondition}).
+     *
+     * @return array<int, array{basket: Basket, label: ?string, open: bool, blockedBy: array<int, string>}>
+     */
+    public function availableTransitions(): array
+    {
+        $current = $this->currentStatus();
+
+        if (! $current) {
+            return [];
+        }
+
+        // The pivot (label + conditions) is eager-loaded by next()->get(), so
+        // decode it directly instead of re-querying per basket (N+1).
+        return $current->next()->get()->map(function (Basket $next) {
+            $reasons = $this->evaluateDecodedConditions(
+                $this->decodePivotActions($next->pivot->conditions ?? null)
+            );
+
+            return [
+                'basket' => $next,
+                'label' => $next->pivot->label,
+                'open' => $reasons === [],
+                'blockedBy' => $reasons,
+            ];
+        })->all();
+    }
+
     // -------------------------------------------------------------------------
     // Transition
     // -------------------------------------------------------------------------
@@ -158,6 +208,7 @@ class WorkflowManager
 
                 $currentBasket = $this->currentStatus();
                 $this->guardAgainstInvalidTransition($currentBasket, $nextBasket);
+                $this->guardAgainstConditions($currentBasket, $nextBasket);
 
                 $this->moveToBasket($currentBasket, $nextBasket);
 
@@ -213,8 +264,9 @@ class WorkflowManager
      * Transition multiple models to the same basket using chunked bulk SQL.
      *
      * NOTE: this is a bulk administrative path. Unlike {@see transition()}, it
-     * does NOT run transition actions (webhooks, emails, logs) and does NOT
-     * emit {@see TransitionEvent}. Models whose transition requires document
+     * does NOT run transition actions (webhooks, emails, logs), does NOT emit
+     * {@see TransitionEvent}, and does NOT evaluate transition conditions.
+     * Models whose transition requires document
      * validation ({@see RequireDocumentAction}) are skipped rather than moved,
      * so the requirement is never silently bypassed — transition them one by
      * one instead.
@@ -526,6 +578,76 @@ class WorkflowManager
             ->flatMap(fn ($a) => $a['config']['documents'] ?? [])
             ->values()
             ->all();
+    }
+
+    // -------------------------------------------------------------------------
+    // Transition conditions (guards)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Block the transition when any guarding condition fails for the subject.
+     *
+     * @throws TransitionConditionException
+     */
+    protected function guardAgainstConditions(Basket $from, Basket $to): void
+    {
+        $reasons = $this->evaluateConditions($from, $to);
+
+        if ($reasons !== []) {
+            throw new TransitionConditionException($from, $to, $reasons);
+        }
+    }
+
+    /**
+     * Evaluate the conditions guarding the transition between two baskets and
+     * return the reason for each failing one ([] = the transition is allowed).
+     *
+     * @return array<int, string>
+     */
+    protected function evaluateConditions(Basket $from, Basket $to): array
+    {
+        return $this->evaluateDecodedConditions($this->decodeTransitionConditions($from, $to));
+    }
+
+    /**
+     * Run a decoded list of conditions against the bound subject.
+     *
+     * @param  array<int, array{type: string, config: array}>  $conditions
+     * @return array<int, string>  Reasons of the conditions that did not pass
+     */
+    protected function evaluateDecodedConditions(array $conditions): array
+    {
+        $reasons = [];
+
+        foreach ($conditions as $entry) {
+            $key = $entry['type'] ?? null;
+
+            if (! $key || ! isset(static::$conditions[$key])) {
+                continue;
+            }
+
+            $conditionClass = static::$conditions[$key];
+            $condition = new $conditionClass;
+            $config = $entry['config'] ?? [];
+
+            if (! $condition->passes($this->subject, $config)) {
+                $reasons[] = $condition->reason($config);
+            }
+        }
+
+        return $reasons;
+    }
+
+    /**
+     * Decode the conditions JSON from the transition pivot between two baskets.
+     *
+     * @return array<int, array{type: string, config: array}>
+     */
+    protected function decodeTransitionConditions(Basket $from, Basket $to): array
+    {
+        $pivot = $from->next()->where('to_basket_id', $to->id)->first()?->pivot;
+
+        return $this->decodePivotActions($pivot?->conditions);
     }
 
     // -------------------------------------------------------------------------
@@ -880,6 +1002,7 @@ class WorkflowManager
                     Basket::query()->find($fromId)->next()->attach($toId, [
                         'label' => $trans['label'] ?? null,
                         'actions' => json_encode($trans['actions'] ?? [], JSON_THROW_ON_ERROR),
+                        'conditions' => json_encode($trans['conditions'] ?? [], JSON_THROW_ON_ERROR),
                     ]);
                 }
             }
