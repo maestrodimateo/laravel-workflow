@@ -12,37 +12,20 @@ Route::get('/', WorkflowAdminController::class)->name('workflow.admin');
 // Admin API (shares web middleware for session-based auth)
 Route::prefix('api')->name('workflow.admin.')->group(function (): void {
 
-    Route::prefix('circuits')->name('circuits.')->group(function (): void {
-        Route::get('/', [CircuitController::class, 'index'])->name('index');
-        Route::post('/', [CircuitController::class, 'store'])->name('store');
-        Route::get('/{circuit}', [CircuitController::class, 'show'])->name('show');
-        Route::put('/{circuit}', [CircuitController::class, 'update'])->name('update');
-        Route::delete('/{circuit}', [CircuitController::class, 'destroy'])->name('destroy');
+    // RESTful resources
+    Route::apiResource('circuits', CircuitController::class);
+    Route::apiResource('baskets', BasketController::class)->only(['store', 'update', 'destroy']);
+    Route::apiResource('circuits.messages', MessageController::class)
+        ->only(['store', 'update', 'destroy'])
+        ->scoped();
 
-        // Admin-specific: load all baskets for a circuit with relations (no pagination, no service)
-        Route::get('/{circuit}/baskets', [WorkflowAdminController::class, 'baskets'])->name('baskets');
-        Route::get('/{circuit}/messages', [WorkflowAdminController::class, 'messages'])->name('messages');
-
-        // Persist basket canvas positions (shared per circuit)
-        Route::patch('/{circuit}/positions', [WorkflowAdminController::class, 'positions'])->name('positions');
-    });
-
-    // Export / Import
-    Route::get('/circuits/{circuit}/export', [WorkflowAdminController::class, 'export'])->name('circuits.export');
-    Route::post('/circuits/import', [WorkflowAdminController::class, 'import'])->name('circuits.import');
-
-    // Transitions
-    Route::put('/transitions/{from}/{to}', [WorkflowAdminController::class, 'updateTransition'])->name('transitions.update');
-
-    Route::prefix('baskets')->name('baskets.')->group(function (): void {
-        Route::post('/', [BasketController::class, 'store'])->name('store');
-        Route::put('/{basket}', [BasketController::class, 'update'])->name('update');
-        Route::delete('/{basket}', [BasketController::class, 'destroy'])->name('destroy');
-    });
-
-    Route::prefix('circuits/{circuit}/messages')->name('messages.')->scopeBindings()->group(function (): void {
-        Route::post('/', [MessageController::class, 'store'])->name('store');
-        Route::put('/{message}', [MessageController::class, 'update'])->name('update');
-        Route::delete('/{message}', [MessageController::class, 'destroy'])->name('destroy');
+    // Circuit sub-resources & designer-specific actions
+    Route::controller(WorkflowAdminController::class)->group(function (): void {
+        Route::get('circuits/{circuit}/baskets', 'baskets')->name('circuits.baskets');
+        Route::get('circuits/{circuit}/messages', 'messages')->name('circuits.messages.index');
+        Route::patch('circuits/{circuit}/positions', 'positions')->name('circuits.positions');
+        Route::get('circuits/{circuit}/export', 'export')->name('circuits.export');
+        Route::post('circuits/import', 'import')->name('circuits.import');
+        Route::put('transitions/{from}/{to}', 'updateTransition')->name('transitions.update');
     });
 });
