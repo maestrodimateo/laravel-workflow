@@ -11,18 +11,19 @@ Comes with a **built-in visual admin interface** to design your workflows by dra
 
 ## Features
 
-- **Visual workflow designer** — drag-and-drop baskets, draw transitions, configure actions
+- **Visual workflow designer** — drag-and-drop baskets, draw transitions, configure actions & conditions
 - **Facade & helper** — `Workflow::for($model)->transition($basketId)` or `workflow($model)->transition($basketId)`
 - **Multi-circuit** — a model can belong to multiple workflows, scoped with `in($circuit)`
 - **Resource locking** — prevent concurrent access with `lock()` / `unlock()`
 - **Role-based access** — define allowed roles per circuit and per basket
 - **Transition actions** — attach actions (email, webhook, log, require documents, custom) to transitions
+- **Conditional transitions** — gate a transition on the model's state; enforced server-side and surfaced to your UI
 - **Duration tracking** — automatic timing between steps with human-readable formatting
 - **Full history** — every transition is logged with who, when, how long, and why
 - **Message templates** — WYSIWYG editor with variable interpolation
 - **Export / Import** — share workflows as JSON files + PNG image export
 - **Dark mode** — the admin UI supports light and dark themes
-- **Zero build step** — the admin UI uses Alpine.js + Tailwind CDN, no npm required
+- **No CDN, no npm** — the admin UI ships vendored assets (compiled Tailwind + Alpine + Quill), served same-origin
 
 ## Requirements
 
@@ -125,6 +126,7 @@ $wf = Workflow::for($model);
 | `in($circuit)` | `WorkflowManager` | Scope to a specific circuit (required for multi-circuit) |
 | `currentStatus()` | `?Basket` | Current basket (step) of the model |
 | `nextBaskets()` | `Collection` | Available baskets to transition to |
+| `availableTransitions()` | `array` | Next baskets each with `open` (bool) + `blockedBy` (reasons) — evaluates conditions |
 | `transition($id, $comment)` | `bool` | Move the model to the next basket |
 | `history()` | `Collection` | Full transition history with durations |
 | `totalDuration()` | `int` | Total processing time in seconds |
@@ -149,6 +151,8 @@ These methods don't require `for()`:
 | `importFromJson($path)` | `Circuit` | Import a circuit from an exported JSON file (for seeders/commands) |
 | `registerAction($class)` | `void` | Register a custom transition action |
 | `getRegisteredActions()` | `array` | List all registered action classes |
+| `registerCondition($class)` | `void` | Register a custom transition condition |
+| `getRegisteredConditions()` | `array` | List all registered condition classes |
 
 ### Role-based queries
 
@@ -422,6 +426,81 @@ With `QUEUE_CONNECTION=sync` (the Laravel default), queueable actions run inline
 
 ---
 
+## Transition Conditions
+
+Gate a transition on the **model's own state**. A condition is evaluated in two places with the same result: it **blocks the transition server-side** (with a rollback) and it tells your own UI whether a transition is open.
+
+### Built-in: attribute condition (no code)
+
+In the designer, open a transition, add a **Condition → Model attribute**, then pick a field, an operator and a value:
+
+| Operator | Meaning |
+|---|---|
+| `=` `!=` | equals / not equals |
+| `<` `<=` `>` `>=` | comparisons |
+| `in` `not_in` | value in a comma-separated list |
+| `empty` `not_empty` | attribute is blank / present |
+| `contains` | string contains |
+
+Example: only allow *Draft → Approved* when `amount <= 1000`.
+
+### Custom conditions (code)
+
+For anything the attribute editor can't express, implement `TransitionCondition`. `passes()` MUST be side-effect free (it also runs when building the UI):
+
+```php
+use Illuminate\Database\Eloquent\Model;
+use Maestrodimateo\Workflow\Contracts\TransitionCondition;
+
+class BudgetApprovedCondition implements TransitionCondition
+{
+    public static function key(): string   { return 'budget_approved'; }
+    public static function label(): string { return 'Budget approved'; }
+
+    public function passes(Model $model, array $config = []): bool
+    {
+        return $model->budget?->is_approved === true;
+    }
+
+    public function reason(array $config = []): string
+    {
+        return 'The budget must be approved first.';
+    }
+
+    // Optional: limit this condition to circuits targeting these models.
+    public static function models(): array { return [\App\Models\Invoice::class]; }
+}
+```
+
+Register it in `config/workflow.php` (the built-in `attribute` condition is always available):
+
+```php
+'conditions' => [
+    App\Workflow\Conditions\BudgetApprovedCondition::class,
+],
+```
+
+### Enforcement & the consumer UI
+
+- **Server** — `transition()` throws `TransitionConditionException` (and rolls back) when a condition fails; `$e->reasons` holds the messages.
+- **Your UI** — `availableTransitions()` returns each next basket with whether it is open and why not, so you can hide or disable blocked steps.
+
+```php
+foreach (Workflow::for($invoice)->availableTransitions() as $t) {
+    // $t['basket'], $t['label'], $t['open'] (bool), $t['blockedBy'] (string[])
+}
+
+try {
+    Workflow::for($invoice)->transition($basketId);
+} catch (\Maestrodimateo\Workflow\Exceptions\TransitionConditionException $e) {
+    return response()->json(['errors' => $e->reasons], 422);
+}
+```
+
+> Conditions must be read-only. The bulk `transitionMany()` admin path does **not** evaluate them (same as actions).
+
+---
+
 ## Events
 
 A `TransitionEvent` is fired after every transition. Add your own listeners:
@@ -643,9 +722,10 @@ $invoice->baskets->count();        // 1 (or more if multiple circuits)
 The visual designer at `/workflow/admin` provides:
 
 - **Circuit management** — create, edit, delete circuits with role assignment
-- **Drag-and-drop canvas** — position baskets freely, auto-layout button
+- **Drag-and-drop canvas** — position baskets freely; the layout is **saved per circuit**, drag the background to pan, auto-layout button
 - **Visual linking** — click output port, then click target basket to create transitions
-- **Transition config** — click a link to add label and actions
+- **Transition config** — click a link to add a label, actions **and conditions**
+- **Keyboard** — `Delete` / `Backspace` removes the selected basket
 - **Message editor** — WYSIWYG editor with variable interpolation
 - **Export / Import** — JSON + PNG export, JSON import
 - **Zoom** — scroll wheel + controls
