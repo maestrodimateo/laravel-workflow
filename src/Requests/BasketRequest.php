@@ -33,6 +33,9 @@ class BasketRequest extends WorkflowFormRequest
             /** Les noms de rôles autorisés pour ce panier */
             'roles' => ['nullable', 'array'],
             'roles.*' => ['string'],
+            /** Les rôles visiteurs (lecture seule) */
+            'visitor_roles' => ['nullable', 'array'],
+            'visitor_roles.*' => ['string'],
             /** Les paniers précédents */
             'previous' => ['array'],
             'previous.*' => [Rule::exists('baskets', 'id')

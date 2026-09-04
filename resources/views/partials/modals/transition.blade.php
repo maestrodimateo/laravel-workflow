@@ -14,7 +14,7 @@
                 <span x-text="tConfig.to?.name"></span>
             </p>
         </div>
-        <div class="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+        <div class="p-6 space-y-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0">
             <div>
                 <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.transition_modal.label') }}</label>
                 <input x-model="tConfig.label" class="sh-input w-full" placeholder="{{ __('workflow::workflow.ui.transition_modal.label_placeholder') }}">
@@ -116,7 +116,12 @@
                             {{-- Declarative attribute condition: field / operator / value --}}
                             <template x-if="condition.type === 'attribute'">
                                 <div x-init="if(!condition.config.op) condition.config.op='='" class="flex items-center gap-2">
-                                    <input x-model="condition.config.field" class="sh-input h-7 text-xs flex-[2]" placeholder="{{ __('workflow::workflow.ui.transition_modal.condition_field_placeholder') }}">
+                                    <select x-model="condition.config.field" class="sh-input h-7 text-xs flex-[2]">
+                                        <option value="">{{ __('workflow::workflow.ui.transition_modal.condition_field_placeholder') }}</option>
+                                        <template x-for="attr in modelAttributes" :key="attr">
+                                            <option :value="attr" x-text="attr"></option>
+                                        </template>
+                                    </select>
                                     <select x-model="condition.config.op" class="sh-input h-7 text-xs flex-1">
                                         <option value="=">=</option>
                                         <option value="!=">&ne;</option>

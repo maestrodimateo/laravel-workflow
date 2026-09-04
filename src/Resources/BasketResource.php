@@ -22,6 +22,7 @@ class BasketResource extends JsonResource
             'status' => $this->status,
             'color' => $this->color,
             'roles' => $this->roles ?? [],
+            'visitor_roles' => $this->visitor_roles ?? [],
             'position' => $this->position,
             'next' => BasketResource::collection($this->whenLoaded('next')),
             'previous' => BasketResource::collection($this->whenLoaded('previous')),

@@ -3,27 +3,56 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/maestrodimateo/laravel-workflow.svg)](https://packagist.org/packages/maestrodimateo/laravel-workflow)
 [![License](https://img.shields.io/packagist/l/maestrodimateo/laravel-workflow.svg)](https://packagist.org/packages/maestrodimateo/laravel-workflow)
 
-A visual, configurable workflow engine for Laravel. Define circuits (workflow definitions), baskets (steps), and transitions — then move any Eloquent model through them with a clean Facade API.
+A visual, configurable workflow engine for Laravel.
+Define circuits (workflows), baskets (steps) and transitions, then move any Eloquent model through them with a clean Facade API.
 
-Comes with a **built-in visual admin interface** to design your workflows by drag-and-drop.
+Ships with a **built-in visual admin interface** to design your workflows by drag-and-drop.
+
+---
+
+## Table of contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Key concepts](#key-concepts)
+- [Facade API](#facade-api)
+- [The Workflowable trait](#the-workflowable-trait)
+- [Multi-circuit](#multi-circuit)
+- [Resource locking](#resource-locking)
+- [Transition actions](#transition-actions)
+- [Transition conditions](#transition-conditions)
+- [Duration tracking](#duration-tracking)
+- [Message templates](#message-templates)
+- [Events](#events)
+- [Export & Import](#export--import)
+- [Admin interface](#admin-interface)
+- [Configuration](#configuration)
+- [Testing](#testing)
+- [License](#license)
 
 ---
 
 ## Features
 
-- **Visual workflow designer** — drag-and-drop baskets, draw transitions, configure actions & conditions
-- **Facade & helper** — `Workflow::for($model)->transition($basketId)` or `workflow($model)->transition($basketId)`
-- **Multi-circuit** — a model can belong to multiple workflows, scoped with `in($circuit)`
-- **Resource locking** — prevent concurrent access with `lock()` / `unlock()`
-- **Role-based access** — define allowed roles per circuit and per basket
-- **Transition actions** — attach actions (email, webhook, log, require documents, custom) to transitions
-- **Conditional transitions** — gate a transition on the model's state; enforced server-side and surfaced to your UI
-- **Duration tracking** — automatic timing between steps with human-readable formatting
-- **Full history** — every transition is logged with who, when, how long, and why
-- **Message templates** — WYSIWYG editor with variable interpolation
-- **Export / Import** — share workflows as JSON files + PNG image export
-- **Dark mode** — the admin UI supports light and dark themes
-- **No CDN, no npm** — the admin UI ships vendored assets (compiled Tailwind + Alpine + Quill), served same-origin
+| Category | Description |
+|---|---|
+| Visual designer | Drag-and-drop baskets, draw transitions, configure actions & conditions |
+| Facade & helper | `Workflow::for($model)->transition($id)` or `workflow($model)->transition($id)` |
+| Multi-circuit | A model can belong to multiple workflows simultaneously |
+| Resource locking | Prevent concurrent access with `lock()` / `unlock()` |
+| Role-based access | Allowed roles per circuit and per basket |
+| Transition actions | Email, webhook, log, required documents, custom actions on each transition |
+| Transition conditions | Gate a transition on the model's state (server-side + UI) |
+| Duration tracking | Automatic timing between steps |
+| Full history | Every transition is logged: who, when, how long, why |
+| Message templates | WYSIWYG editor with variable interpolation |
+| Export / Import | Share workflows as JSON + PNG image export |
+| Dark mode | Light and dark themes |
+| No CDN | Vendored assets, served same-origin, works offline |
+
+---
 
 ## Requirements
 
@@ -54,13 +83,11 @@ php artisan vendor:publish --tag=workflow-views
 
 ---
 
-## Quick Start
+## Quick start
 
 ### 1. Add the trait to your model
 
 ```php
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
 use Maestrodimateo\Workflow\Traits\Workflowable;
 
 class Invoice extends Model
@@ -69,35 +96,32 @@ class Invoice extends Model
 }
 ```
 
-When an `Invoice` is created, it's automatically placed in the **DRAFT** basket of the circuit targeting it.
+When an `Invoice` is created, it is automatically placed in the **DRAFT** basket of every circuit targeting it.
 
 ### 2. Open the visual designer
 
-Navigate to `/workflow/admin` in your browser. From there you can:
+Navigate to `/workflow/admin`. From there you can:
 
-- Create a **circuit** (workflow) targeting your model
-- Add **baskets** (steps) with colors and roles
-- Draw **transitions** (links) between baskets by dragging from one to another
-- Configure **actions** on each transition (send email, call webhook, etc.)
+1. Create a **circuit** targeting your model
+2. Add **baskets** (steps) with colors and roles
+3. Draw **transitions** by dragging from one basket to another
+4. Configure **actions** and **conditions** on each transition
 
 ### 3. Transition models in your code
 
 ```php
 use Maestrodimateo\Workflow\Facades\Workflow;
 
-// Get current status
+// Current status
 $basket = Workflow::for($invoice)->currentStatus();
-echo $basket->name;   // "Brouillon"
-echo $basket->status; // "DRAFT"
+$basket->name;   // "Draft"
+$basket->status; // "DRAFT"
 
-// See available next steps
+// Available next steps
 $options = Workflow::for($invoice)->nextBaskets();
 
 // Transition
-Workflow::for($invoice)->transition(
-    $nextBasket->id,
-    'Approved by manager',  // optional comment
-);
+Workflow::for($invoice)->transition($nextBasket->id, 'Approved by manager');
 ```
 
 The `workflow()` helper is also available:
@@ -109,34 +133,66 @@ workflow($invoice)->transition($basketId);
 
 ---
 
-## Facade API Reference
+## Key concepts
+
+The package is built around three concepts:
+
+```
+Circuit (workflow)
+ └── Basket (step)
+      └── Transition (directed link between two baskets)
+           ├── Actions    (what happens when the model moves)
+           └── Conditions (what prevents the model from moving)
+```
+
+| Concept | Description | Example |
+|---|---|---|
+| **Circuit** | A complete workflow targeting an Eloquent model | "Invoice approval" |
+| **Basket** | A step in the circuit, with a status, color and roles | "Pending review" |
+| **Transition** | A directed link between two baskets, carrying actions and conditions | Draft &rarr; Review |
+
+---
+
+## Facade API
 
 All methods are available via `Workflow::` or `workflow()->`.
 
 ### Model-bound methods
 
-These methods require `Workflow::for($model)` first:
+Always prefixed with `Workflow::for($model)`:
 
 ```php
 $wf = Workflow::for($model);
 ```
 
+**Navigation:**
+
 | Method | Returns | Description |
 |---|---|---|
-| `in($circuit)` | `WorkflowManager` | Scope to a specific circuit (required for multi-circuit) |
-| `currentStatus()` | `?Basket` | Current basket (step) of the model |
-| `nextBaskets()` | `Collection` | Available baskets to transition to |
-| `availableTransitions()` | `array` | Next baskets each with `open` (bool) + `blockedBy` (reasons) — evaluates conditions |
-| `transition($id, $comment)` | `bool` | Move the model to the next basket |
-| `history()` | `Collection` | Full transition history with durations |
-| `totalDuration()` | `int` | Total processing time in seconds |
-| `durationInStatus($status)` | `int` | Time spent in a specific status (seconds) |
-| `allStatuses()` | `array` | Current basket per circuit |
+| `in($circuit)` | `WorkflowManager` | Scope to a specific circuit |
+| `currentStatus()` | `?Basket` | Current basket of the model |
+| `nextBaskets()` | `Collection` | Baskets reachable from the current one |
+| `availableTransitions()` | `array` | Next baskets with `open` (bool) and `blockedBy` (reasons) |
+| `allStatuses()` | `array` | Current basket in every circuit |
 | `circuits()` | `Collection` | All circuits the model belongs to |
+
+**Actions:**
+
+| Method | Returns | Description |
+|---|---|---|
+| `transition($id, $comment)` | `bool` | Move the model to the target basket |
 | `lock($minutes)` | `WorkflowLock` | Lock the model for exclusive access |
 | `unlock($force)` | `void` | Release the lock |
-| `isLocked()` | `bool` | Check if locked |
-| `isLockedByMe()` | `bool` | Check if locked by the current user |
+
+**Queries:**
+
+| Method | Returns | Description |
+|---|---|---|
+| `history()` | `Collection` | Full transition history |
+| `totalDuration()` | `int` | Total processing time in seconds |
+| `durationInStatus($status)` | `int` | Time spent in a specific status (seconds) |
+| `isLocked()` | `bool` | Is the model locked? |
+| `isLockedByMe()` | `bool` | Locked by the current user? |
 | `lockedBy()` | `?string` | User ID holding the lock |
 | `lockExpiration()` | `?Carbon` | When the lock expires |
 | `requiredDocuments($basketId)` | `array` | Documents required for a transition |
@@ -144,11 +200,11 @@ $wf = Workflow::for($model);
 
 ### Static methods
 
-These methods don't require `for()`:
+No `for()` needed:
 
 | Method | Returns | Description |
 |---|---|---|
-| `importFromJson($path)` | `Circuit` | Import a circuit from an exported JSON file (for seeders/commands) |
+| `importFromJson($path)` | `Circuit` | Import a circuit from an exported JSON file |
 | `registerAction($class)` | `void` | Register a custom transition action |
 | `getRegisteredActions()` | `array` | List all registered action classes |
 | `registerCondition($class)` | `void` | Register a custom transition condition |
@@ -156,121 +212,136 @@ These methods don't require `for()`:
 
 ### Role-based queries
 
-These methods don't require `for()`:
-
 ```php
 // Circuits accessible to a role
 Workflow::circuitsForRole('manager');
 Workflow::circuitsForRoles(['admin', 'manager']);
 
-// Baskets accessible to a role (optionally scoped to a circuit)
+// Baskets accessible to a role
 Workflow::basketsForRole('validator');
 Workflow::basketsForRole('validator', $circuitId);
 Workflow::basketsForRoles(['admin', 'operator'], $circuitId);
 ```
 
-Eloquent scopes are also available directly:
+Equivalent Eloquent scopes:
 
 ```php
-use Maestrodimateo\Workflow\Models\Circuit;
-use Maestrodimateo\Workflow\Models\Basket;
-
 Circuit::forRole('admin')->get();
 Basket::forRoles(['admin', 'manager'])->get();
 
-$basket->hasRole('validator'); // true/false
-$circuit->hasRole('admin');    // true/false
+$basket->hasRole('validator');  // true/false
+$circuit->hasRole('admin');     // true/false
 ```
 
 ---
 
-## Duration Tracking
+## The Workflowable trait
 
-Every transition automatically records the time spent in the previous step:
+The trait adds relations, methods and scopes directly on your model.
+
+### Relations
 
 ```php
-$history = Workflow::for($invoice)->history();
-
-foreach ($history as $entry) {
-    echo $entry->previous_status;  // "DRAFT"
-    echo $entry->next_status;      // "REVIEW"
-    echo $entry->duration_seconds; // 3600
-    echo $entry->duration_human;   // "1h"
-    echo $entry->done_by;          // User ID
-    echo $entry->comment;          // "Sent for review"
-}
-
-// Total time
-$seconds = Workflow::for($invoice)->totalDuration();
-
-// Time in a specific step
-$reviewTime = Workflow::for($invoice)->durationInStatus('REVIEW');
+$invoice->baskets;        // All baskets (past and current)
+$invoice->histories;      // Transition history
+$invoice->workflowLock;   // Active lock (or null)
 ```
 
-Human-readable formats: `45s`, `12min`, `2h 35min`, `3j 4h`.
+### Methods
+
+```php
+// Current status
+$invoice->currentStatus();              // Across all circuits
+$invoice->currentStatus($circuit);      // In a specific circuit
+
+// Inspect the basket
+$basket = $invoice->currentStatus();
+$basket->status;   // "REVIEW"
+$basket->name;     // "Under Review"
+$basket->color;    // "#2563eb"
+$basket->roles;    // ["manager", "validator"]
+$basket->next;     // Collection<Basket> — possible next steps
+$basket->previous; // Collection<Basket> — where it came from
+```
+
+### Scopes
+
+```php
+// Models in a specific basket
+Invoice::fromBasket($reviewBasket)->get();
+
+// Unlocked models
+Invoice::unlocked()->get();
+
+// Models locked by a specific user
+Invoice::lockedBy(auth()->id())->get();
+
+// Combine scopes
+Invoice::fromBasket($reviewBasket)->unlocked()->get();
+```
+
+### Automatic behavior
+
+When a model is created, it is attached to the DRAFT basket of **every** circuit targeting its class:
+
+```php
+$invoice = Invoice::create(['number' => 'INV-001']);
+
+$invoice->currentStatus()->status; // "DRAFT"
+$invoice->baskets->count();        // 1 (or more if multiple circuits)
+```
 
 ---
 
-## Multi-Circuit Support
+## Multi-circuit
 
-A model can belong to multiple circuits simultaneously. Use `in()` to scope operations:
+A model can belong to multiple circuits at the same time.
+
+Use `in()` to scope operations:
 
 ```php
-// Scope to a specific circuit
 Workflow::for($invoice)->in($approvalCircuit)->currentStatus();
 Workflow::for($invoice)->in($complianceCircuit)->transition($basketId);
 Workflow::for($invoice)->in('circuit-uuid')->history();
+```
 
-// See status in ALL circuits at once
+See all statuses at once:
+
+```php
 $statuses = Workflow::for($invoice)->allStatuses();
 // [
 //     'circuit-a-id' => ['circuit' => Circuit, 'basket' => Basket],
 //     'circuit-b-id' => ['circuit' => Circuit, 'basket' => Basket],
 // ]
-
-// List circuits the model belongs to
-$circuits = Workflow::for($invoice)->circuits();
 ```
-
-When a model is created, it's automatically attached to the DRAFT basket of **every** circuit targeting its class.
 
 ---
 
-## Resource Locking
+## Resource locking
 
-Prevent multiple operators from working on the same model simultaneously:
+Prevent multiple operators from working on the same model simultaneously.
+
+### Usage
 
 ```php
-// Lock the model (default: 30 minutes)
+// Lock (default: 30 minutes)
 Workflow::for($invoice)->lock();
-Workflow::for($invoice)->lock(60); // 1 hour
+Workflow::for($invoice)->lock(60);  // 1 hour
 
-// Check lock status
-Workflow::for($invoice)->isLocked();       // true
-Workflow::for($invoice)->isLockedByMe();   // true
-Workflow::for($invoice)->lockedBy();       // "user-uuid"
-Workflow::for($invoice)->lockExpiration(); // Carbon instance
+// Check
+Workflow::for($invoice)->isLocked();
+Workflow::for($invoice)->isLockedByMe();
+Workflow::for($invoice)->lockedBy();        // "user-uuid"
+Workflow::for($invoice)->lockExpiration();  // Carbon
 
-// Transition (auto-checks the lock)
+// Transition — automatically checks the lock
 Workflow::for($invoice)->transition($basketId);
-// → OK if you hold the lock (lock is released after transition)
-// → ModelLockedException if locked by someone else
+// OK if you hold the lock (released after transition)
+// ModelLockedException if locked by someone else
 
-// Release manually
+// Release
 Workflow::for($invoice)->unlock();
-
-// Admin force unlock
-Workflow::for($invoice)->unlock(force: true);
-```
-
-### Query scopes
-
-```php
-// Available models (not locked or lock expired)
-Invoice::fromBasket($reviewBasket)->unlocked()->get();
-
-// Models I'm working on
-Invoice::lockedBy(auth()->id())->get();
+Workflow::for($invoice)->unlock(force: true);  // admin
 ```
 
 ### Handling lock exceptions
@@ -281,14 +352,11 @@ use Maestrodimateo\Workflow\Exceptions\ModelLockedException;
 try {
     Workflow::for($invoice)->transition($basketId);
 } catch (ModelLockedException $e) {
-    return back()->withErrors([
-        'lock' => $e->getMessage(),
-        // "Ce dossier est verrouillé par [user] jusqu'à [14:30]."
-    ]);
+    // "This resource is locked by [user] until [14:30]."
 }
 ```
 
-Configure the default lock duration in `.env`:
+### Configuration
 
 ```env
 WORKFLOW_LOCK_DURATION=30  # minutes
@@ -296,32 +364,30 @@ WORKFLOW_LOCK_DURATION=30  # minutes
 
 ---
 
-## Transition Actions
+## Transition actions
 
-Actions are executed automatically when a specific transition occurs. They are **configured visually** in the admin UI.
+Actions execute automatically when a transition occurs. They are **configured visually** in the designer.
 
 ### Built-in actions
 
-| Action | Key | Config | Runs |
+| Action | Key | Config | Execution |
 |---|---|---|---|
-| Send email | `send_email` | Select a message from the circuit | Queue (after commit) |
-| Webhook | `webhook` | URL to POST to | Queue (after commit) |
+| Send email | `send_email` | Select a message from the circuit | Queued (after commit) |
+| Webhook | `webhook` | Target URL | Queued (after commit) |
 | Log | `log` | Optional message | After commit |
 | Require documents | `require_document` | List of documents (type + label) | In transaction |
 
-### Transaction behavior
+### Execution modes
 
-Every `transition()` is wrapped in a single DB transaction (model move, history insert, lock release). Each action runs in one of three modes depending on which marker interface it implements:
+Every `transition()` is wrapped in a DB transaction. Actions run in one of three modes:
 
-- **In transaction (default)** — the action runs inside the transition transaction. A thrown exception rolls back the entire transition. Use this for validations (e.g., `require_document`) or DB writes that must be atomic with the transition.
-- **After commit** (`AfterCommitAction`) — the action runs inline once the transition has been committed to the database. Use this for fast non-rollbackable side effects (logging, in-memory cache invalidation) where queueing would be overkill.
-- **Queued** (`QueueableAction`) — the action is wrapped in a job and dispatched after commit, executed by a queue worker. Use this for slow or external side effects (HTTP calls, email, third-party APIs) so the request returns immediately and transient failures can be retried by the worker.
+| Mode | Interface | When to use |
+|---|---|---|
+| **In transaction** (default) | — | Validations, atomic DB writes. An exception rolls back the transition. |
+| **After commit** | `AfterCommitAction` | Fast, non-rollbackable side effects (log, cache). |
+| **Queued** | `QueueableAction` | Slow or external side effects (email, HTTP, APIs). The request returns immediately. |
 
-`SendEmailAction` and `WebhookAction` implement `QueueableAction`. `LogTransitionAction` implements `AfterCommitAction`. `RequireDocumentAction` runs inline — its throw must be able to abort the transition.
-
-### Custom actions
-
-Generate a new action with artisan:
+### Creating a custom action
 
 ```bash
 php artisan make:workflow-action GeneratePdfAction
@@ -334,8 +400,8 @@ use Maestrodimateo\Workflow\Contracts\TransitionAction;
 
 class GeneratePdfAction implements TransitionAction
 {
-    public static function key(): string { return 'generate_pdf'; }
-    public static function label(): string { return 'Generate Pdf'; }
+    public static function key(): string   { return 'generate_pdf'; }
+    public static function label(): string { return 'Generate PDF'; }
 
     public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
     {
@@ -350,11 +416,11 @@ Register it in your `AppServiceProvider::boot()`:
 Workflow::registerAction(GeneratePdfAction::class);
 ```
 
-The action immediately appears in the admin UI's "Add action" menu on any transition.
+The action immediately appears in the designer's "Add action" menu on any transition.
 
-### Opting an action out of the transaction
+### After-commit action
 
-If your custom action produces an external side effect that cannot be rolled back (HTTP call, email, push notification, third-party SDK), add the `AfterCommitAction` marker so it only runs once the transition is safely committed:
+For non-rollbackable external side effects:
 
 ```php
 use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
@@ -362,24 +428,19 @@ use Maestrodimateo\Workflow\Contracts\TransitionAction;
 
 class NotifySlackAction implements TransitionAction, AfterCommitAction
 {
-    public static function key(): string { return 'notify_slack'; }
+    public static function key(): string   { return 'notify_slack'; }
     public static function label(): string { return 'Notify Slack'; }
 
     public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
     {
-        Http::post($config['webhook_url'], [
-            'model' => $model->getKey(),
-            'to'    => $to->status,
-        ]);
+        Http::post($config['webhook_url'], ['model' => $model->getKey(), 'to' => $to->status]);
     }
 }
 ```
 
-Validation-style actions (those that may throw to abort the transition) should NOT implement `AfterCommitAction` — their exception needs to roll back the transition, which is only possible from inside the transaction.
+### Queued action
 
-### Running an action on a queue
-
-For slow side effects (HTTP calls, email, third-party APIs), implement `QueueableAction` instead. The action is wrapped in a job and dispatched after commit, so the request returns immediately and the worker picks it up:
+For slow side effects — the request returns immediately:
 
 ```php
 use Maestrodimateo\Workflow\Contracts\QueueableAction;
@@ -387,69 +448,64 @@ use Maestrodimateo\Workflow\Contracts\TransitionAction;
 
 class NotifySlackAction implements TransitionAction, QueueableAction
 {
-    public static function key(): string { return 'notify_slack'; }
-    public static function label(): string { return 'Notify Slack'; }
-
-    // Return null to use the package default (workflow.actions_queue.queue),
-    // then Laravel's default queue.
-    public static function queue(): ?string { return 'notifications'; }
-
-    // Same fallback chain for the queue connection.
+    public static function key(): string       { return 'notify_slack'; }
+    public static function label(): string     { return 'Notify Slack'; }
+    public static function queue(): ?string    { return 'notifications'; }
     public static function connection(): ?string { return null; }
 
     public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
     {
-        Http::post($config['webhook_url'], [
-            'model' => $model->getKey(),
-            'to'    => $to->status,
-        ]);
+        Http::post($config['webhook_url'], ['model' => $model->getKey(), 'to' => $to->status]);
     }
 }
 ```
 
 What you get for free:
 
-- **Race-free dispatch** — the job is sent inside `DB::afterCommit()`, so the worker can never read the transition's rows before they're visible.
-- **Fresh state on the worker** — the subject, source and target baskets are serialized by reference (`SerializesModels`) and re-fetched from the DB when the job runs.
-- **Automatic retries** — Laravel's queue worker handles retries, backoff, and failed-jobs storage like any other job.
+- **Race-free dispatch** — the job is sent via `DB::afterCommit()`, so the worker never sees an intermediate state
+- **Fresh state** — the model is re-fetched from the DB when the job runs
+- **Automatic retries** — handled by the Laravel queue worker like any other job
 
-Override the queue and connection globally via `.env`:
+Global configuration:
 
 ```env
 WORKFLOW_ACTIONS_QUEUE=workflow
 WORKFLOW_ACTIONS_QUEUE_CONNECTION=redis
 ```
 
-With `QUEUE_CONNECTION=sync` (the Laravel default), queueable actions run inline on the request — useful for local development without a running worker. Switching to `redis`, `database`, or `sqs` is enough to move them off the request lifecycle; no code change required.
+> With `QUEUE_CONNECTION=sync`, queued actions run inline. Switching to `redis` or `database` is enough to offload them — no code change needed.
 
-> A `QueueableAction` already runs after commit — you don't need to also implement `AfterCommitAction`.
+> A `QueueableAction` already runs after commit — no need to also implement `AfterCommitAction`.
 
 ---
 
-## Transition Conditions
+## Transition conditions
 
-Gate a transition on the **model's own state**. A condition is evaluated in two places with the same result: it **blocks the transition server-side** (with a rollback) and it tells your own UI whether a transition is open.
+Gate a transition on the model's own state. Conditions are evaluated in **two places** with the same result:
+
+- **Server-side** — the transition is rejected with a rollback
+- **Your UI** — `availableTransitions()` tells you which transitions are open or blocked
 
 ### Built-in: attribute condition (no code)
 
-In the designer, open a transition, add a **Condition → Model attribute**, then pick a field, an operator and a value:
+In the designer, open a transition and add **Condition &rarr; Model attribute**.
+Pick a field, an operator and a value.
 
 | Operator | Meaning |
 |---|---|
-| `=` `!=` | equals / not equals |
-| `<` `<=` `>` `>=` | comparisons |
-| `in` `not_in` | value in a comma-separated list |
-| `empty` `not_empty` | attribute is blank / present |
-| `contains` | string contains |
+| `=` `!=` | Equals / not equals |
+| `<` `<=` `>` `>=` | Comparisons |
+| `in` `not_in` | Value in a comma-separated list |
+| `empty` `not_empty` | Attribute is blank / present |
+| `contains` | String contains |
 
-Example: only allow *Draft → Approved* when `amount <= 1000`.
+Example: only allow *Draft &rarr; Approved* when `amount <= 1000`.
 
-### Custom conditions (code)
+### Custom condition
 
-For anything the attribute editor can't express, implement `TransitionCondition`. `passes()` MUST be side-effect free (it also runs when building the UI):
+For anything the attribute editor can't express:
 
 ```php
-use Illuminate\Database\Eloquent\Model;
 use Maestrodimateo\Workflow\Contracts\TransitionCondition;
 
 class BudgetApprovedCondition implements TransitionCondition
@@ -467,12 +523,15 @@ class BudgetApprovedCondition implements TransitionCondition
         return 'The budget must be approved first.';
     }
 
-    // Optional: limit this condition to circuits targeting these models.
-    public static function models(): array { return [\App\Models\Invoice::class]; }
+    // Optional: limit this condition to specific models
+    public static function models(): array
+    {
+        return [\App\Models\Invoice::class];
+    }
 }
 ```
 
-Register it in `config/workflow.php` (the built-in `attribute` condition is always available):
+Register it in `config/workflow.php`:
 
 ```php
 'conditions' => [
@@ -480,77 +539,65 @@ Register it in `config/workflow.php` (the built-in `attribute` condition is alwa
 ],
 ```
 
-### Enforcement & the consumer UI
-
-- **Server** — `transition()` throws `TransitionConditionException` (and rolls back) when a condition fails; `$e->reasons` holds the messages.
-- **Your UI** — `availableTransitions()` returns each next basket with whether it is open and why not, so you can hide or disable blocked steps.
+### Application side
 
 ```php
+// Check which transitions are available
 foreach (Workflow::for($invoice)->availableTransitions() as $t) {
-    // $t['basket'], $t['label'], $t['open'] (bool), $t['blockedBy'] (string[])
+    $t['basket'];     // Target basket
+    $t['label'];      // Transition label
+    $t['open'];       // true/false
+    $t['blockedBy'];  // ["The budget must be approved first."]
 }
 
+// Handle rejection
 try {
     Workflow::for($invoice)->transition($basketId);
 } catch (\Maestrodimateo\Workflow\Exceptions\TransitionConditionException $e) {
-    return response()->json(['errors' => $e->reasons], 422);
+    $e->reasons;  // ["The budget must be approved first."]
 }
 ```
 
-> Conditions must be read-only. The bulk `transitionMany()` admin path does **not** evaluate them (same as actions).
+> Conditions must be read-only (no side effects).
 
 ---
 
-## Events
+## Duration tracking
 
-A `TransitionEvent` is fired after every transition. Add your own listeners:
-
-```php
-// In your EventServiceProvider
-protected $listen = [
-    \Maestrodimateo\Workflow\Events\TransitionEvent::class => [
-        \App\Listeners\NotifySlack::class,
-        \App\Listeners\SyncWithExternalSystem::class,
-    ],
-];
-```
+Every transition automatically records the time spent in the previous step.
 
 ```php
-public function handle(TransitionEvent $event): void
-{
-    $event->currentBasket; // Source basket
-    $event->nextBasket;    // Target basket
-    $event->model;         // The transitioned model
-    $event->comment;       // Transition comment
+$history = Workflow::for($invoice)->history();
+
+foreach ($history as $entry) {
+    $entry->previous_status;  // "DRAFT"
+    $entry->next_status;      // "REVIEW"
+    $entry->duration_seconds; // 3600
+    $entry->duration_human;   // "1h"
+    $entry->done_by;          // User ID
+    $entry->comment;          // "Sent for review"
 }
+
+// Total time
+Workflow::for($invoice)->totalDuration();             // seconds
+
+// Time in a specific step
+Workflow::for($invoice)->durationInStatus('REVIEW');  // seconds
 ```
 
-### What happens during a transition
-
-```
-1. Lock guard — throws ModelLockedException if locked by another user
-2. DB transaction opens
-   a. Model detached from current basket, attached to next
-   b. In-transaction actions executed (e.g. require_document — may throw and rollback)
-   c. TransitionEvent fired → HistoryListener records history with duration
-   d. Lock released
-3. DB transaction commits
-4. After-commit actions executed inline (log, any AfterCommitAction)
-5. Queueable actions dispatched to the queue (send_email, webhook, any QueueableAction)
-6. Your custom listeners run
-```
+Human-readable formats: `45s`, `12min`, `2h 35min`, `3d 4h`.
 
 ---
 
-## Message Templates
+## Message templates
 
-Messages are created at the circuit level and can be used in transition actions (e.g., `send_email`).
+Messages are created at the circuit level and used in transition actions (`send_email`).
 
 The WYSIWYG editor supports **variable interpolation**:
 
 ```
-Bonjour, la demande {{ reference }} a été transférée de {{ from_name }}
-vers {{ to_name }} par {{ user }} le {{ datetime }}.
+Hello, request {{ reference }} has been moved from {{ from_name }}
+to {{ to_name }} by {{ user }} on {{ datetime }}.
 ```
 
 ### Built-in variables
@@ -571,44 +618,109 @@ vers {{ to_name }} par {{ user }} le {{ datetime }}.
 // config/workflow.php
 'message_variables' => [
     'reference' => fn ($model) => $model->reference,
-    'montant'   => fn ($model) => number_format($model->amount, 2, ',', ' ') . ' €',
+    'amount'    => fn ($model) => number_format($model->amount, 2, '.', ','),
 ],
 ```
 
 ---
 
-## Export / Import
+## Events
 
-### In the admin UI
+A `TransitionEvent` is fired after every transition:
 
-- **Export JSON** — download the full circuit definition as a `.json` file
+```php
+// EventServiceProvider
+protected $listen = [
+    \Maestrodimateo\Workflow\Events\TransitionEvent::class => [
+        \App\Listeners\NotifySlack::class,
+    ],
+];
+```
+
+```php
+public function handle(TransitionEvent $event): void
+{
+    $event->currentBasket; // Source basket
+    $event->nextBasket;    // Target basket
+    $event->model;         // The transitioned model
+    $event->comment;       // Transition comment
+}
+```
+
+### What happens during a transition
+
+```
+1. Lock guard (ModelLockedException if locked by another user)
+
+2. DB transaction
+   a. Model detached from current basket, attached to next
+   b. In-transaction actions (e.g. require_document — may throw and rollback)
+   c. TransitionEvent → HistoryListener records history + duration
+   d. Lock released
+
+3. Commit
+
+4. After-commit actions (log, AfterCommitAction)
+5. Queued actions (send_email, webhook, QueueableAction)
+6. Your custom listeners
+```
+
+---
+
+## Export & Import
+
+### From the admin UI
+
+- **Export JSON** — download the full circuit definition
 - **Export PNG** — download a high-resolution image of the workflow diagram
-- **Import** — select a `.json` file to recreate a circuit with all its configuration
+- **Import** — select a `.json` file to recreate a circuit
 
 ### Via API
 
-```bash
+```
 GET  /workflow/admin/api/circuits/{circuit}/export
-POST /workflow/admin/api/circuits/import  # multipart form, field: "file"
+POST /workflow/admin/api/circuits/import  (multipart, field: "file")
 ```
 
 ### Programmatic import (seeders, commands)
 
-Import a previously exported JSON file directly from code — no HTTP request needed:
-
 ```php
 use Maestrodimateo\Workflow\Facades\Workflow;
 
-// In a seeder
 Workflow::importFromJson(database_path('seeders/workflow-invoices.json'));
-
-// Or via the manager directly
-app(\Maestrodimateo\Workflow\WorkflowManager::class)::importFromJson($path);
 ```
 
-The method creates the full circuit (baskets, transitions, messages) inside a database transaction and returns the newly created `Circuit` instance with all relations loaded.
+Creates the full circuit (baskets, transitions, messages) inside a DB transaction.
+Returns the `Circuit` instance with all relations loaded.
+Throws `\InvalidArgumentException` if the file is invalid.
 
-Throws `\InvalidArgumentException` if the file is missing or has an invalid format.
+---
+
+## Admin interface
+
+The visual designer is available at `/workflow/admin`.
+
+| Feature | Details |
+|---|---|
+| Circuits | Create, edit, delete, assign roles |
+| Canvas | Drag-and-drop baskets, panning, auto-layout |
+| Linking | Click the output port then click the target basket |
+| Transitions | Click a link to configure label, actions, conditions |
+| Baskets | `Delete` / `Backspace` to remove the selected basket |
+| Messages | WYSIWYG editor with variables |
+| Export / Import | JSON + PNG export, JSON import |
+| Zoom | Scroll wheel + controls |
+| Theme | Light / dark |
+
+### Front-end assets
+
+Libraries (compiled Tailwind, Alpine.js, Quill) are vendored under `resources/dist/` and served **same-origin** — no CDN. The UI works offline and under a strict CSP.
+
+Only maintainers editing the Blade views need Node:
+
+```bash
+npx tailwindcss@3 -c tailwind.config.js -i resources/css/input.css -o resources/dist/app.css --minify
+```
 
 ---
 
@@ -617,138 +729,52 @@ Throws `\InvalidArgumentException` if the file is missing or has an invalid form
 ```php
 // config/workflow.php
 return [
+    // Routes & middleware
     'routes' => [
         'prefix'           => 'workflow',
-        'middleware'        => ['api'],
-        'admin_middleware'  => ['web'],
+        'middleware'        => ['api', 'auth'],
+        'admin_middleware'  => ['web', 'auth'],
     ],
+
+    // Authorization gate (define in a ServiceProvider)
+    // Gate::define('manage-workflow', fn ($user) => $user->isAdmin());
+    'authorization' => [
+        'gate' => 'manage-workflow',
+    ],
+
+    // User attribute stored in history
     'auth_identifier' => 'id',
+
+    // Custom variables for message templates
     'message_variables' => [],
-    'actions' => [],
+
+    // Custom actions & conditions
+    'actions'    => [],
+    'conditions' => [],
+
+    // Queue settings for async actions
     'actions_queue' => [
-        'queue' => env('WORKFLOW_ACTIONS_QUEUE'),           // null → Laravel's default queue
-        'connection' => env('WORKFLOW_ACTIONS_QUEUE_CONNECTION'), // null → Laravel's default connection
+        'queue'      => env('WORKFLOW_ACTIONS_QUEUE'),
+        'connection' => env('WORKFLOW_ACTIONS_QUEUE_CONNECTION'),
+        'tries'      => 3,
+        'backoff'    => [10, 30, 60],
+        'timeout'    => 30,
     ],
+
+    // Lock duration
     'lock' => [
         'duration_minutes' => 30,
     ],
+
+    // SSRF protection for webhooks
+    'webhook' => [
+        'allowed_schemes'      => ['https'],
+        'allowed_hosts'        => [],
+        'block_private_ranges' => true,
+        'timeout'              => 5,
+    ],
 ];
 ```
-
----
-
-## Workflowable Trait
-
-The `Workflowable` trait adds relations, methods, and scopes directly on your model instance. Everything below is available without using the Facade.
-
-### Relations
-
-```php
-$invoice->baskets;        // Collection<Basket> — all baskets the model is/has been in
-$invoice->histories;      // Collection<History> — all transition history entries
-$invoice->workflowLock;   // WorkflowLock|null — the active lock on this model
-```
-
-### Methods
-
-```php
-// Current status (last basket attached)
-$invoice->currentStatus();                // ?Basket — across all circuits
-$invoice->currentStatus($circuit);        // ?Basket — in a specific circuit
-$invoice->currentStatus('circuit-uuid');   // same with a string ID
-
-// Inspect the current basket
-$invoice->currentStatus()->status;        // "REVIEW"
-$invoice->currentStatus()->name;          // "Under Review"
-$invoice->currentStatus()->color;         // "#2563eb"
-$invoice->currentStatus()->roles;         // ["manager", "validator"]
-$invoice->currentStatus()->hasRole('manager'); // true
-
-// Access the circuit
-$invoice->currentStatus()->circuit->name; // "Invoice Approval"
-
-// Navigate the workflow graph
-$invoice->currentStatus()->next;          // Collection<Basket> — possible next steps
-$invoice->currentStatus()->previous;      // Collection<Basket> — where it came from
-
-// History with duration tracking
-$invoice->histories->each(function ($h) {
-    $h->previous_status;   // "DRAFT"
-    $h->next_status;       // "REVIEW"
-    $h->comment;           // "Sent for review"
-    $h->done_by;           // "user-uuid"
-    $h->duration_seconds;  // 3600
-    $h->duration_human;    // "1h"
-    $h->created_at;        // Carbon
-});
-
-// Lock info
-$invoice->workflowLock?->locked_by;      // "user-uuid" or null
-$invoice->workflowLock?->expires_at;     // Carbon or null
-$invoice->workflowLock?->isActive();     // true if not expired
-```
-
-### Scopes
-
-```php
-// Models currently in a specific basket
-Invoice::fromBasket($reviewBasket)->get();
-
-// Available models (not locked or lock expired)
-Invoice::unlocked()->get();
-
-// Models locked by a specific user
-Invoice::lockedBy(auth()->id())->get();
-
-// Combine scopes
-Invoice::fromBasket($reviewBasket)->unlocked()->get();
-```
-
-### Automatic Behavior
-
-When a model is created, it's automatically attached to the DRAFT basket of every circuit targeting its class:
-
-```php
-$invoice = Invoice::create(['number' => 'INV-001']);
-
-$invoice->currentStatus()->status; // "DRAFT" — automatic
-$invoice->baskets->count();        // 1 (or more if multiple circuits)
-```
-
----
-
-## Admin Interface
-
-The visual designer at `/workflow/admin` provides:
-
-- **Circuit management** — create, edit, delete circuits with role assignment
-- **Drag-and-drop canvas** — position baskets freely; the layout is **saved per circuit**, drag the background to pan, auto-layout button
-- **Visual linking** — click output port, then click target basket to create transitions
-- **Transition config** — click a link to add a label, actions **and conditions**
-- **Keyboard** — `Delete` / `Backspace` removes the selected basket
-- **Message editor** — WYSIWYG editor with variable interpolation
-- **Export / Import** — JSON + PNG export, JSON import
-- **Zoom** — scroll wheel + controls
-- **Dark mode** — toggle between light and dark themes
-- **No build step** — works out of the box (assets are vendored, see below)
-
-### Front-end assets
-
-The designer's front-end libraries (a **compiled, purged** Tailwind stylesheet,
-Alpine.js and Quill) are vendored under `resources/dist/` and served
-**same-origin** by the package at `/workflow/assets/{file}`. There is **no CDN**:
-the UI works offline / air-gapped and under a strict Content-Security-Policy, and
-nothing external is loaded (so Subresource Integrity is not applicable).
-
-Only maintainers editing the Blade views need Node — regenerate the stylesheet
-after any markup change:
-
-```bash
-npx tailwindcss@3 -c tailwind.config.js -i resources/css/input.css -o resources/dist/app.css --minify
-```
-
-The committed `resources/dist/app.css` is the shipped artifact; consumers never
-run a build.
 
 ---
 
@@ -756,11 +782,7 @@ run a build.
 
 ```bash
 composer test
-```
-
-Or with Pest directly:
-
-```bash
+# or
 ./vendor/bin/pest
 ```
 
@@ -768,7 +790,7 @@ Or with Pest directly:
 
 ## License
 
-MIT. See [LICENSE](LICENSE) for details.
+MIT. See [LICENSE](LICENSE).
 
 ---
 

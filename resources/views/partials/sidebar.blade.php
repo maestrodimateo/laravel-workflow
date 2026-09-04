@@ -25,12 +25,15 @@
                 </div>
                 <div>
                     <label class="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{{ __('workflow::workflow.ui.sidebar.roles') }}</label>
-                    <div class="flex flex-wrap gap-1 mt-1" x-show="(sel.roles || []).length">
-                        <template x-for="r in (sel.roles || [])" :key="r">
+                    <div class="flex flex-wrap gap-1 mt-1" x-show="(sel.roles || []).length || (sel.visitor_roles || []).length">
+                        <template x-for="r in (sel.roles || [])" :key="'op-'+r">
                             <span class="sh-badge text-[10px]" x-text="r"></span>
                         </template>
+                        <template x-for="r in (sel.visitor_roles || [])" :key="'vi-'+r">
+                            <span class="sh-badge text-[10px] opacity-60" x-text="r + ' (visitor)'"></span>
+                        </template>
                     </div>
-                    <p x-show="!(sel.roles || []).length" class="text-muted-foreground text-xs mt-0.5">{{ __('workflow::workflow.ui.sidebar.none') }}</p>
+                    <p x-show="!(sel.roles || []).length && !(sel.visitor_roles || []).length" class="text-muted-foreground text-xs mt-0.5">{{ __('workflow::workflow.ui.sidebar.none') }}</p>
                 </div>
             </div>
 

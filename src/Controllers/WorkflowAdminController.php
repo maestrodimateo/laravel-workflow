@@ -11,7 +11,10 @@ use Maestrodimateo\Workflow\Enums\RecipientType;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Circuit;
 use Maestrodimateo\Workflow\Services\MessageVariableResolver;
+use Maestrodimateo\Workflow\Traits\Workflowable;
 use Maestrodimateo\Workflow\WorkflowManager;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class WorkflowAdminController
@@ -44,6 +47,8 @@ class WorkflowAdminController
             'conditions' => $conditions,
             'variables' => MessageVariableResolver::availableKeys(),
             'apiPrefix' => './admin/api',
+            'workflowableModels' => $this->discoverWorkflowableModels(),
+            'configuredRoles' => config('workflow.roles', []),
         ]);
     }
 
@@ -150,6 +155,7 @@ class WorkflowAdminController
             'status' => $b->status,
             'color' => $b->getRawOriginal('color'),
             'roles' => $b->roles ?? [],
+            'visitor_roles' => $b->visitor_roles ?? [],
             'transitions' => $b->next->map(fn (Basket $n) => [
                 '_to_ref' => $n->id,
                 'label' => $n->pivot->label,
@@ -207,5 +213,30 @@ class WorkflowAdminController
         }
 
         return response()->json($circuit, 201);
+    }
+
+    /**
+     * Scan app/Models for classes using the Workflowable trait.
+     * Returns each model's FQCN, short label, and database columns.
+     */
+    private function discoverWorkflowableModels(): array
+    {
+        $modelsPath = app_path('Models');
+
+        if (! is_dir($modelsPath)) {
+            return [];
+        }
+
+        return collect(File::allFiles($modelsPath))
+            ->map(fn ($file) => 'App\\Models\\'.str_replace(['/', '.php'], ['\\', ''], $file->getRelativePathname()))
+            ->filter(fn ($class) => class_exists($class))
+            ->filter(fn ($class) => in_array(Workflowable::class, class_uses_recursive($class)))
+            ->map(fn ($class) => [
+                'class' => $class,
+                'label' => class_basename($class),
+                'attributes' => Schema::getColumnListing((new $class)->getTable()),
+            ])
+            ->values()
+            ->toArray();
     }
 }

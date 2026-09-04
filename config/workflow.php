@@ -41,6 +41,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Roles
+    |--------------------------------------------------------------------------
+    | Available roles for circuits and baskets. When set, the admin UI shows
+    | checkboxes instead of a free-text input. Leave empty to allow any value.
+    |
+    | Example:
+    | 'roles' => ['admin', 'manager', 'validator', 'operator'],
+    */
+    'roles' => [],
+
+    /*
+    |--------------------------------------------------------------------------
     | Auth
     |--------------------------------------------------------------------------
     | The attribute used to identify who performed a transition.

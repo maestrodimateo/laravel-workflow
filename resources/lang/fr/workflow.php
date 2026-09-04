@@ -13,6 +13,8 @@ return [
             'previous_baskets' => 'Panier(s) précédent(s)',
             'name_placeholder' => 'Ex: En révision',
             'status_placeholder' => 'REVIEW',
+            'role_operator' => 'Opérateur',
+            'role_visitor' => 'Visiteur',
         ],
 
         'circuit_modal' => [

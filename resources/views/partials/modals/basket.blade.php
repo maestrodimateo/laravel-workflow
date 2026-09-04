@@ -36,12 +36,16 @@
             </div>
             <div x-show="circuitRoles.length">
                 <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.basket_modal.allowed_roles') }}</label>
-                <div class="space-y-1 max-h-32 overflow-y-auto border border-border rounded-md p-2">
+                <div class="space-y-1 max-h-40 overflow-y-auto border border-border rounded-md p-2">
                     <template x-for="r in circuitRoles" :key="r">
-                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-accent rounded-sm cursor-pointer">
-                            <input type="checkbox" :checked="bForm.roles.includes(r)" @change="toggleArr(bForm.roles, r)" class="rounded border-border">
-                            <span class="text-sm text-foreground" x-text="r"></span>
-                        </label>
+                        <div class="flex items-center gap-2 px-2 py-1">
+                            <span class="text-sm text-foreground flex-1" x-text="r"></span>
+                            <select class="sh-input h-7 text-xs w-28" :value="roleAccess(r)" @change="setRoleAccess(r, $event.target.value)">
+                                <option value="">&mdash;</option>
+                                <option value="operator">{{ __('workflow::workflow.ui.basket_modal.role_operator') }}</option>
+                                <option value="visitor">{{ __('workflow::workflow.ui.basket_modal.role_visitor') }}</option>
+                            </select>
+                        </div>
                     </template>
                 </div>
             </div>

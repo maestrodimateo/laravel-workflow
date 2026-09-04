@@ -983,6 +983,7 @@ class WorkflowManager
                     'status' => $basketData['status'],
                     'color' => $basketData['color'],
                     'roles' => $basketData['roles'] ?? [],
+                    'visitor_roles' => $basketData['visitor_roles'] ?? [],
                 ]);
                 $refMap[$basketData['_ref']] = $basket->id;
             }

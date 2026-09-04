@@ -120,6 +120,12 @@
             /** @type {Array} Registered transition conditions (guards) */
             availableConditions: @json($conditions),
 
+            /** @type {Array} Models using the Workflowable trait, with their DB columns */
+            workflowableModels: @json($workflowableModels),
+
+            /** @type {Array} Roles from config (empty = free-text input) */
+            configuredRoles: @json($configuredRoles),
+
             /** @type {boolean} Dark mode active */
             dark: localStorage.getItem('wf-dark') === '1'
                 || (!localStorage.getItem('wf-dark') && window.matchMedia('(prefers-color-scheme:dark)').matches),
@@ -217,7 +223,7 @@
             circuitForm: { name: '', targetModel: '', description: '', roles: [] },
 
             /** @type {Object} Basket create/edit form data */
-            basketForm: { name: '', status: '', color: '', circuit_id: '', roles: [], previous: [] },
+            basketForm: { name: '', status: '', color: '', circuit_id: '', roles: [], visitor_roles: [], previous: [] },
 
             /** @type {Object} Message create form data */
             messageForm: { subject: '', content: '', type: '', recipient: '', circuit_id: '', basket_id: null },
@@ -392,6 +398,21 @@
             set mForm(v) { this.messageForm = v; },
             get tConfig() { return this.transitionConfig; },
             set tConfig(v) { this.transitionConfig = v; },
+
+            /** Workflowable models not yet assigned to a circuit (+ current if editing) */
+            get availableTargetModels() {
+                const used = this.circuits.map(c => c.targetModel || c.model);
+                return this.workflowableModels.filter(m =>
+                    !used.includes(m.class) || (this.editingId && m.class === this.circuitForm.targetModel)
+                );
+            },
+
+            /** DB columns of the current circuit's target model */
+            get modelAttributes() {
+                if (!this.circuit) return [];
+                const target = this.circuit.targetModel || this.circuit.model;
+                return this.workflowableModels.find(m => m.class === target)?.attributes || [];
+            },
             get linkTarget() { return this.sidebarLinkTarget; },
             set linkTarget(v) { this.sidebarLinkTarget = v; },
             get positions() { return this.nodePositions; },
@@ -411,6 +432,21 @@
             color(c) { return this.resolveColor(c); },
             pos(id) { return this.getNodePosition(id); },
             toggleArr(arr, v) { this.toggleArrayValue(arr, v); },
+
+            /** Get the access level of a role for the current basket form */
+            roleAccess(role) {
+                if (this.basketForm.roles.includes(role)) return 'operator';
+                if (this.basketForm.visitor_roles.includes(role)) return 'visitor';
+                return '';
+            },
+
+            /** Set the access level of a role for the current basket form */
+            setRoleAccess(role, access) {
+                this.basketForm.roles = this.basketForm.roles.filter(r => r !== role);
+                this.basketForm.visitor_roles = this.basketForm.visitor_roles.filter(r => r !== role);
+                if (access === 'operator') this.basketForm.roles.push(role);
+                if (access === 'visitor') this.basketForm.visitor_roles.push(role);
+            },
             notify(msg, ok = true) { this.showToast(msg, ok); },
             parseActions(v) { return this.parseActionsJson(v); },
             actionLabel(k) { return this.getActionLabel(k); },
@@ -973,6 +1009,7 @@
                         circuit_id: this.circuit.id,
                         previous: previousIds,
                         roles: toBasket.roles || [],
+                        visitor_roles: toBasket.visitor_roles || [],
                     });
                     this.linkSource = null;
                     await this.refreshBaskets();
@@ -1005,6 +1042,7 @@
                         circuit_id: this.circuit.id,
                         previous: remainingPrevious,
                         roles: toBasket.roles || [],
+                        visitor_roles: toBasket.visitor_roles || [],
                     });
                     await this.refreshBaskets();
                     this.selectedBasket = this.baskets.find(b => b.id === fromBasket.id) || null;
@@ -1489,7 +1527,7 @@
                     name: '', status: '',
                     color: this.colors[0]?.value || '#64748b',
                     circuit_id: this.circuit.id,
-                    roles: [], previous: [],
+                    roles: [], visitor_roles: [], previous: [],
                 };
                 this.validationErrors = {};
                 this.activeModal = 'basket';
@@ -1503,6 +1541,7 @@
                     color: this.resolveColor(basket.color),
                     circuit_id: this.circuit.id,
                     roles: [...(basket.roles || [])],
+                    visitor_roles: [...(basket.visitor_roles || [])],
                     previous: (basket.previous || []).map(p => p.id),
                 };
                 this.validationErrors = {};

@@ -13,6 +13,8 @@ return [
             'previous_baskets' => 'Previous Basket(s)',
             'name_placeholder' => 'Ex: Under review',
             'status_placeholder' => 'REVIEW',
+            'role_operator' => 'Operator',
+            'role_visitor' => 'Visitor',
         ],
 
         'circuit_modal' => [
