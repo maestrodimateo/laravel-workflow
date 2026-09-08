@@ -216,19 +216,25 @@ class WorkflowAdminController
     }
 
     /**
-     * Scan app/Models for classes using the Workflowable trait.
+     * Scan configured directories for classes using the Workflowable trait.
      * Returns each model's FQCN, short label, and database columns.
      */
     private function discoverWorkflowableModels(): array
     {
-        $modelsPath = app_path('Models');
+        /** @var array<string, string> $paths */
+        $paths = config('workflow.model_paths', ['app/Models' => 'App\\Models']);
 
-        if (! is_dir($modelsPath)) {
-            return [];
-        }
+        return collect($paths)
+            ->flatMap(function (string $namespace, string $directory) {
+                $path = base_path($directory);
 
-        return collect(File::allFiles($modelsPath))
-            ->map(fn ($file) => 'App\\Models\\'.str_replace(['/', '.php'], ['\\', ''], $file->getRelativePathname()))
+                if (! is_dir($path)) {
+                    return [];
+                }
+
+                return collect(File::allFiles($path))
+                    ->map(fn ($file) => $namespace.'\\'.str_replace(['/', '.php'], ['\\', ''], $file->getRelativePathname()));
+            })
             ->filter(fn ($class) => class_exists($class))
             ->filter(fn ($class) => in_array(Workflowable::class, class_uses_recursive($class)))
             ->map(fn ($class) => [

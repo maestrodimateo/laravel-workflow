@@ -160,6 +160,26 @@ return [
     |   link-local/reserved IPs (e.g. 127.0.0.1, 10.0.0.0/8, 169.254.169.254).
     | - timeout: request timeout in seconds.
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Model Discovery
+    |--------------------------------------------------------------------------
+    | Directories scanned for Workflowable models (relative to base_path()).
+    | Useful for DDD architectures where models live outside app/Models/.
+    |
+    | Each entry maps a directory path to its root namespace.
+    |
+    | Example:
+    | 'model_paths' => [
+    |     'app/Models'                   => 'App\\Models',
+    |     'app/Domain/Demande/Models'    => 'App\\Domain\\Demande\\Models',
+    |     'app/Domain/Freight/Models'    => 'App\\Domain\\Freight\\Models',
+    | ],
+    */
+    'model_paths' => [
+        'app/Models' => 'App\\Models',
+    ],
+
     'webhook' => [
         'allowed_schemes' => ['https'],
         'allowed_hosts' => [],
