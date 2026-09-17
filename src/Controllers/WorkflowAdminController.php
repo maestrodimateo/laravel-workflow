@@ -52,6 +52,40 @@ class WorkflowAdminController
         ]);
     }
 
+    /**
+     * Expose designer metadata as JSON for SPA frontends (actions, conditions,
+     * colors, message types, recipient types, variables, workflowable models, roles).
+     */
+    public function config(): JsonResponse
+    {
+        $actions = collect(WorkflowManager::getRegisteredActions())
+            ->map(fn ($class, $key) => [
+                'key' => $key,
+                'label' => $class::label(),
+                'models' => WorkflowManager::actionModels($class),
+            ])
+            ->values();
+
+        $conditions = collect(WorkflowManager::getRegisteredConditions())
+            ->map(fn ($class, $key) => [
+                'key' => $key,
+                'label' => $class::label(),
+                'models' => WorkflowManager::actionModels($class),
+            ])
+            ->values();
+
+        return response()->json([
+            'colors' => collect(AllowedBasketColors::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
+            'messageTypes' => collect(MessageType::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
+            'recipientTypes' => collect(RecipientType::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
+            'actions' => $actions,
+            'conditions' => $conditions,
+            'variables' => MessageVariableResolver::availableKeys(),
+            'workflowableModels' => $this->discoverWorkflowableModels(),
+            'configuredRoles' => config('workflow.roles', []),
+        ]);
+    }
+
     public function baskets(Circuit $circuit): JsonResponse
     {
         return response()->json(
