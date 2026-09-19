@@ -260,7 +260,8 @@
              *  plus those limited to this circuit's targetModel. */
             get scopedActions() {
                 const tm = this.circuit?.targetModel;
-                return this.availableActions.filter(a => !a.models?.length || (tm && a.models.includes(tm)));
+                const used = new Set(this.tConfig.actions.map(a => a.type));
+                return this.availableActions.filter(a => (!a.models?.length || (tm && a.models.includes(tm))) && !used.has(a.key));
             },
 
             /** Conditions selectable for the active circuit (transversal + model-scoped). */
