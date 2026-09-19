@@ -9,9 +9,7 @@
      @click.self="sel=null;linking=null;$nextTick(()=>drawEdges())"
      @keydown.escape.window="if(linking){linking=null;drawEdges()}"
      :class="linking ? 'cursor-crosshair' : 'cursor-grab'"
-     :style="dark
-         ? 'background-image:radial-gradient(hsl(240 3.7% 15.9%) 1px,transparent 1px);background-size:24px 24px;background-color:hsl(240 10% 3.9%)'
-         : 'background-image:radial-gradient(hsl(240 5.9% 90%) 1px,transparent 1px);background-size:24px 24px;background-color:hsl(0 0% 98%)'">
+     style="background-image:radial-gradient(hsl(var(--border)) 1px,transparent 1px);background-size:24px 24px;background-color:hsl(var(--background))">
 
     {{-- Empty state --}}
     <div x-show="!circuit" class="flex flex-col items-center justify-center h-full fade-in">

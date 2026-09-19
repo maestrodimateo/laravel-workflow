@@ -19,8 +19,9 @@ Route::prefix('api')->name('workflow.admin.')->group(function (): void {
         ->only(['store', 'update', 'destroy'])
         ->scoped();
 
-    // Circuit sub-resources & designer-specific actions
+    // Configuration & designer-specific actions
     Route::controller(WorkflowAdminController::class)->group(function (): void {
+        Route::get('config', 'config')->name('config');
         Route::get('circuits/{circuit}/baskets', 'baskets')->name('circuits.baskets');
         Route::get('circuits/{circuit}/messages', 'messages')->name('circuits.messages.index');
         Route::patch('circuits/{circuit}/positions', 'positions')->name('circuits.positions');
