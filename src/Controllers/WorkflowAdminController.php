@@ -232,6 +232,7 @@ class WorkflowAdminController
     {
         $request->validate([
             'file' => ['required', 'file', 'mimes:json,txt', 'max:2048'],
+            'overwrite' => ['sometimes', 'boolean'],
         ]);
 
         // Write uploaded file to a temp path so importFromJson can read it
@@ -239,7 +240,7 @@ class WorkflowAdminController
         file_put_contents($tempPath, $request->file('file')->get());
 
         try {
-            $circuit = WorkflowManager::importFromJson($tempPath);
+            $circuit = WorkflowManager::importFromJson($tempPath, $request->boolean('overwrite'));
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         } finally {

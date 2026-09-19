@@ -138,6 +138,7 @@ return [
         'circuit_deleted' => 'Deleted',
         'circuit_exported' => 'Circuit exported',
         'circuit_imported' => 'Circuit imported',
+        'import_overwrite_confirm' => 'Overwrite existing circuit if configuration changed?',
         'basket_updated' => 'Basket updated',
         'basket_created' => 'Basket created',
         'basket_deleted' => 'Deleted',

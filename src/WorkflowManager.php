@@ -946,13 +946,19 @@ class WorkflowManager
     /**
      * Import a circuit from a JSON file exported via the admin panel.
      *
-     * @param  string  $path  Absolute path to the exported JSON file
-     * @return Circuit The newly created circuit with all relations loaded
+     * When $overwrite is true and a circuit with the same name+targetModel
+     * exists, the configuration is replaced in place. Baskets are matched by
+     * status so that models already attached (statusable pivot) survive the
+     * update. Removed statuses are re-mapped to the first imported basket.
+     *
+     * @param  string  $path       Absolute path to the exported JSON file
+     * @param  bool    $overwrite  Replace existing circuit if found
+     * @return Circuit The created or updated circuit with all relations loaded
      *
      * @throws \InvalidArgumentException If the file is missing or has an invalid format
      * @throws Throwable
      */
-    public static function importFromJson(string $path): Circuit
+    public static function importFromJson(string $path, bool $overwrite = false): Circuit
     {
         if (! file_exists($path)) {
             throw new \InvalidArgumentException("File not found: {$path}");
@@ -964,57 +970,110 @@ class WorkflowManager
             throw new \InvalidArgumentException("Invalid workflow JSON format in: {$path}");
         }
 
-        $circuit = DB::transaction(function () use ($data) {
+        $circuit = DB::transaction(function () use ($data, $overwrite) {
             $circuitData = $data['circuit'];
-
-            $circuit = new Circuit;
-            $circuit->forceFill([
-                'name' => $circuitData['name'],
-                'targetModel' => $circuitData['targetModel'],
-                'description' => $circuitData['description'] ?? null,
-                'roles' => $circuitData['roles'] ?? [],
-            ]);
-            $circuit->saveQuietly();
-
             $refMap = [];
-            foreach ($data['baskets'] ?? [] as $basketData) {
-                $basket = $circuit->baskets()->create([
-                    'name' => $basketData['name'],
-                    'status' => $basketData['status'],
-                    'color' => $basketData['color'],
-                    'roles' => $basketData['roles'] ?? [],
-                    'visitor_roles' => $basketData['visitor_roles'] ?? [],
-                ]);
-                $refMap[$basketData['_ref']] = $basket->id;
+
+            $existing = $overwrite
+                ? Circuit::where('name', $circuitData['name'])
+                    ->where('targetModel', $circuitData['targetModel'])
+                    ->first()
+                : null;
+
+            if ($existing) {
+                $circuit = $existing;
+                $circuit->forceFill([
+                    'description' => $circuitData['description'] ?? null,
+                    'roles' => $circuitData['roles'] ?? [],
+                ])->saveQuietly();
+
+                // Map old baskets by status — pull() removes matched entries
+                // so only deleted statuses remain after the loop.
+                $oldByStatus = $circuit->baskets->pluck('id', 'status');
+
+                // Clear transitions and messages (baskets stay for statusable)
+                DB::table('transition')
+                    ->whereIn('from_basket_id', $oldByStatus->values())
+                    ->delete();
+                $circuit->messages()->delete();
+
+                // Upsert baskets by status — in-place update preserves statusable
+                foreach ($data['baskets'] ?? [] as $b) {
+                    $status = strtoupper($b['status']);
+                    if ($oldByStatus->has($status)) {
+                        $basket = Basket::find($oldByStatus->pull($status));
+                        $basket->update([
+                            'name' => $b['name'],
+                            'color' => $b['color'],
+                            'roles' => $b['roles'] ?? [],
+                            'visitor_roles' => $b['visitor_roles'] ?? [],
+                        ]);
+                    } else {
+                        $basket = $circuit->baskets()->create([
+                            'name' => $b['name'], 'status' => $b['status'],
+                            'color' => $b['color'], 'roles' => $b['roles'] ?? [],
+                            'visitor_roles' => $b['visitor_roles'] ?? [],
+                        ]);
+                    }
+                    $refMap[$b['_ref']] = $basket->id;
+                }
+
+                // Removed statuses: move attached models to first basket, then delete
+                $fallback = collect($refMap)->first();
+                foreach ($oldByStatus as $basketId) {
+                    if ($fallback) {
+                        DB::table('statusable')
+                            ->where('basket_id', $basketId)
+                            ->update(['basket_id' => $fallback]);
+                    }
+                    Basket::destroy($basketId);
+                }
+            } else {
+                $circuit = new Circuit;
+                $circuit->forceFill([
+                    'name' => $circuitData['name'],
+                    'targetModel' => $circuitData['targetModel'],
+                    'description' => $circuitData['description'] ?? null,
+                    'roles' => $circuitData['roles'] ?? [],
+                ])->saveQuietly();
+
+                foreach ($data['baskets'] ?? [] as $b) {
+                    $basket = $circuit->baskets()->create([
+                        'name' => $b['name'], 'status' => $b['status'],
+                        'color' => $b['color'], 'roles' => $b['roles'] ?? [],
+                        'visitor_roles' => $b['visitor_roles'] ?? [],
+                    ]);
+                    $refMap[$b['_ref']] = $basket->id;
+                }
             }
 
-            foreach ($data['baskets'] ?? [] as $basketData) {
-                $fromId = $refMap[$basketData['_ref']] ?? null;
+            // Transitions
+            foreach ($data['baskets'] ?? [] as $b) {
+                $fromId = $refMap[$b['_ref']] ?? null;
                 if (! $fromId) {
                     continue;
                 }
-
-                foreach ($basketData['transitions'] ?? [] as $trans) {
-                    $toId = $refMap[$trans['_to_ref']] ?? null;
+                foreach ($b['transitions'] ?? [] as $t) {
+                    $toId = $refMap[$t['_to_ref']] ?? null;
                     if (! $toId) {
                         continue;
                     }
-
                     Basket::query()->find($fromId)->next()->attach($toId, [
-                        'label' => $trans['label'] ?? null,
-                        'actions' => json_encode($trans['actions'] ?? [], JSON_THROW_ON_ERROR),
-                        'conditions' => json_encode($trans['conditions'] ?? [], JSON_THROW_ON_ERROR),
+                        'label' => $t['label'] ?? null,
+                        'actions' => json_encode($t['actions'] ?? [], JSON_THROW_ON_ERROR),
+                        'conditions' => json_encode($t['conditions'] ?? [], JSON_THROW_ON_ERROR),
                     ]);
                 }
             }
 
-            foreach ($data['messages'] ?? [] as $msgData) {
+            // Messages
+            foreach ($data['messages'] ?? [] as $m) {
                 $circuit->messages()->create([
-                    'subject' => $msgData['subject'],
-                    'content' => $msgData['content'],
-                    'type' => $msgData['type'],
-                    'recipient' => $msgData['recipient'],
-                    'basket_id' => $refMap[$msgData['_basket_ref']] ?? null,
+                    'subject' => $m['subject'],
+                    'content' => $m['content'],
+                    'type' => $m['type'],
+                    'recipient' => $m['recipient'],
+                    'basket_id' => $refMap[$m['_basket_ref']] ?? null,
                 ]);
             }
 

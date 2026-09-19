@@ -1487,8 +1487,11 @@
                 if (!file) return;
                 event.target.value = '';
 
+                const overwrite = confirm(this.t('notifications.import_overwrite_confirm'));
+
                 const formData = new FormData();
                 formData.append('file', file);
+                if (overwrite) formData.append('overwrite', '1');
 
                 try {
                     const response = await fetch(API_BASE + '/circuits/import', {
@@ -1505,7 +1508,13 @@
                     const circuit = await response.json();
                     circuit.baskets = circuit.baskets || [];
                     circuit.messages = circuit.messages || [];
-                    this.circuits.push(circuit);
+
+                    const idx = this.circuits.findIndex(c => c.id === circuit.id);
+                    if (idx !== -1) {
+                        this.circuits[idx] = circuit;
+                    } else {
+                        this.circuits.push(circuit);
+                    }
                     this.selectCircuit(circuit);
                     this.showToast(this.t('notifications.circuit_imported'));
                 } catch (error) {
@@ -1732,6 +1741,7 @@
                     'notifications.circuit_deleted': '{{ __("workflow::workflow.notifications.circuit_deleted") }}',
                     'notifications.circuit_exported': '{{ __("workflow::workflow.notifications.circuit_exported") }}',
                     'notifications.circuit_imported': '{{ __("workflow::workflow.notifications.circuit_imported") }}',
+                    'notifications.import_overwrite_confirm': '{{ __("workflow::workflow.notifications.import_overwrite_confirm") }}',
                     'notifications.basket_updated': '{{ __("workflow::workflow.notifications.basket_updated") }}',
                     'notifications.basket_created': '{{ __("workflow::workflow.notifications.basket_created") }}',
                     'notifications.basket_deleted': '{{ __("workflow::workflow.notifications.basket_deleted") }}',
