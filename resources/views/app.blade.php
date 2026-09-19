@@ -10,10 +10,10 @@
          (no CDN), so the designer works offline / air-gapped and under a
          strict Content-Security-Policy. Regenerate app.css after editing any
          Blade view: see tailwind.config.js. --}}
-    <link rel="stylesheet" href="{{ route('workflow.assets', 'app.css') }}">
-    <link rel="stylesheet" href="{{ route('workflow.assets', 'quill.snow.css') }}">
-    <script src="{{ route('workflow.assets', 'quill.js') }}"></script>
-    <script defer src="{{ route('workflow.assets', 'alpine.min.js') }}"></script>
+    <link rel="stylesheet" href="{{ route('workflow.assets', 'app.css', false) }}">
+    <link rel="stylesheet" href="{{ route('workflow.assets', 'quill.snow.css', false) }}">
+    <script src="{{ route('workflow.assets', 'quill.js', false) }}"></script>
+    <script defer src="{{ route('workflow.assets', 'alpine.min.js', false) }}"></script>
 </head>
 
 <body class="h-full overflow-hidden bg-background text-foreground antialiased"
