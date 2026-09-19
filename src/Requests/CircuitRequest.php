@@ -19,12 +19,20 @@ class CircuitRequest extends WorkflowFormRequest
     {
         return [
             /** Le nom du circuit */
-            'name' => ['required', 'string', Rule::unique('circuits')->ignore($this->circuit)],
-            'targetModel' => ['required', fn ($attribute, $value, $fail) => ! class_exists($value) ? $fail($attribute.' must be a valid model class') : null],
-            'description' => ['nullable', 'string'],
+            'name' => ['required', 'string', 'max:255', Rule::unique('circuits')->ignore($this->circuit)],
+            'targetModel' => ['required', 'string', 'max:255', function ($attribute, $value, $fail) {
+                if (! class_exists($value)) {
+                    $fail($attribute.' must be a valid model class.');
+                    return;
+                }
+                if (! in_array(\Maestrodimateo\Workflow\Traits\Workflowable::class, class_uses_recursive($value))) {
+                    $fail($attribute.' must use the Workflowable trait.');
+                }
+            }],
+            'description' => ['nullable', 'string', 'max:1000'],
             /** Les rôles autorisés pour ce circuit */
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['string'],
+            'roles.*' => ['string', 'max:100'],
         ];
     }
 

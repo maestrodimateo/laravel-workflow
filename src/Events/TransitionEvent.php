@@ -17,8 +17,4 @@ class TransitionEvent
         public ?string $comment = null,
     ) {}
 
-    public function broadcastOn(): array
-    {
-        return [];
-    }
 }

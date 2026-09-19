@@ -64,6 +64,15 @@ class WorkflowManager
     }
 
     /**
+     * Clear registered actions and conditions (useful for tests and Octane).
+     */
+    public static function resetRegistry(): void
+    {
+        static::$actions = [];
+        static::$conditions = [];
+    }
+
+    /**
      * Target-model classes an action is limited to.
      *
      * An action is transversal (available in every circuit) by default. To

@@ -22,20 +22,20 @@ class BasketRequest extends WorkflowFormRequest
     {
         return [
             /** Le nom du panier */
-            'name' => ['required', 'string', Rule::unique('baskets')
+            'name' => ['required', 'string', 'max:255', Rule::unique('baskets')
                 ->where('circuit_id', $this->circuit_id)
                 ->ignore($this->basket)],
             /** Le statut du panier */
-            'status' => ['required', 'string'],
+            'status' => ['required', 'string', 'max:255'],
             'color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             /** L'identifiant du circuit */
             'circuit_id' => ['required', 'exists:circuits,id'],
             /** Les noms de rôles autorisés pour ce panier */
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['string'],
+            'roles.*' => ['string', 'max:100'],
             /** Les rôles visiteurs (lecture seule) */
             'visitor_roles' => ['nullable', 'array'],
-            'visitor_roles.*' => ['string'],
+            'visitor_roles.*' => ['string', 'max:100'],
             /** Les paniers précédents */
             'previous' => ['array'],
             'previous.*' => [Rule::exists('baskets', 'id')

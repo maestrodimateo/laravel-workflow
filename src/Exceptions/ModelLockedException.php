@@ -2,7 +2,6 @@
 
 namespace Maestrodimateo\Workflow\Exceptions;
 
-use Illuminate\Support\Carbon;
 use Maestrodimateo\Workflow\Models\WorkflowLock;
 use RuntimeException;
 
@@ -19,13 +18,4 @@ class ModelLockedException extends RuntimeException
         );
     }
 
-    public function lockedBy(): string
-    {
-        return $this->lock->locked_by;
-    }
-
-    public function expiresAt(): Carbon
-    {
-        return $this->lock->expires_at;
-    }
 }

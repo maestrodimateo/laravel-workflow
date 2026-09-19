@@ -149,19 +149,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Webhook Action (SSRF protection)
-    |--------------------------------------------------------------------------
-    | Outbound webhook URLs configured on transitions are validated before the
-    | request is sent server-side, to prevent Server-Side Request Forgery.
-    |
-    | - allowed_schemes: URL schemes accepted (default: https only).
-    | - allowed_hosts: when non-empty, ONLY these hosts are callable (allow-list).
-    | - block_private_ranges: reject hosts resolving to private/loopback/
-    |   link-local/reserved IPs (e.g. 127.0.0.1, 10.0.0.0/8, 169.254.169.254).
-    | - timeout: request timeout in seconds.
-    */
-    /*
-    |--------------------------------------------------------------------------
     | Model Discovery
     |--------------------------------------------------------------------------
     | Directories scanned for Workflowable models (relative to base_path()).
@@ -180,6 +167,19 @@ return [
         'app/Models' => 'App\\Models',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Webhook Action (SSRF protection)
+    |--------------------------------------------------------------------------
+    | Outbound webhook URLs configured on transitions are validated before the
+    | request is sent server-side, to prevent Server-Side Request Forgery.
+    |
+    | - allowed_schemes: URL schemes accepted (default: https only).
+    | - allowed_hosts: when non-empty, ONLY these hosts are callable (allow-list).
+    | - block_private_ranges: reject hosts resolving to private/loopback/
+    |   link-local/reserved IPs (e.g. 127.0.0.1, 10.0.0.0/8, 169.254.169.254).
+    | - timeout: request timeout in seconds.
+    */
     'webhook' => [
         'allowed_schemes' => ['https'],
         'allowed_hosts' => [],

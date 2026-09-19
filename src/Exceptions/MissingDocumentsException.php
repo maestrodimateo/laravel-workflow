@@ -30,19 +30,4 @@ class MissingDocumentsException extends RuntimeException
         return $this->documents;
     }
 
-    /**
-     * @return string[]
-     */
-    public function getLabels(): array
-    {
-        return array_column($this->documents, 'label');
-    }
-
-    /**
-     * @return string[]
-     */
-    public function getTypes(): array
-    {
-        return array_column($this->documents, 'type');
-    }
 }

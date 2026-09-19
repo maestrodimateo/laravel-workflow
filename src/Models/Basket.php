@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Maestrodimateo\Workflow\Traits\HasRoles;
 
 /**
@@ -95,14 +94,6 @@ class Basket extends Model
     public function messages(): HasMany
     {
         return $this->hasMany(Message::class);
-    }
-
-    /**
-     * Get all the models for the basket.
-     */
-    public function targetModels(): MorphToMany
-    {
-        return $this->morphedByMany($this->circuit->targetModel, 'statusable', 'statusable');
     }
 
 }

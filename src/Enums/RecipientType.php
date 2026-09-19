@@ -2,12 +2,8 @@
 
 namespace Maestrodimateo\Workflow\Enums;
 
-use Maestrodimateo\Workflow\Traits\CasesManipulation;
-
 enum RecipientType: string
 {
-    use CasesManipulation;
-
     /**
      * The subject of the request
      */

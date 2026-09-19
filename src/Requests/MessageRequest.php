@@ -24,13 +24,13 @@ class MessageRequest extends WorkflowFormRequest
     {
         return [
             /** Type de message */
-            'type' => ['required', Rule::in(MessageType::values())],
+            'type' => ['required', Rule::in(array_column(MessageType::cases(), 'value'))],
             /** Contenu du message */
-            'content' => ['required', 'string'],
+            'content' => ['required', 'string', 'max:65535'],
             /** Objet du message */
-            'subject' => ['required', 'string'],
+            'subject' => ['required', 'string', 'max:255'],
             /** Type de destinataire */
-            'recipient' => ['required', Rule::in(RecipientType::values())],
+            'recipient' => ['required', Rule::in(array_column(RecipientType::cases(), 'value'))],
             /** Identifiant du circuit */
             'circuit_id' => ['required', 'uuid', 'exists:circuits,id'],
         ];

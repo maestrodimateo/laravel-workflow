@@ -37,42 +37,4 @@ trait HasRoles
         return in_array($role, $this->roles ?? [], true);
     }
 
-    /**
-     * Check if a role has visitor (read-only) access.
-     */
-    public function hasVisitorRole(string $role): bool
-    {
-        return in_array($role, $this->visitor_roles ?? [], true);
-    }
-
-    /**
-     * Check if a role has any access (operator or visitor).
-     */
-    public function isAccessibleByRole(string $role): bool
-    {
-        return $this->hasRole($role) || $this->hasVisitorRole($role);
-    }
-
-    /**
-     * Scope: accessible by role as operator or visitor.
-     */
-    public function scopeAccessibleByRole(Builder $query, string $role): Builder
-    {
-        return $query->where(fn (Builder $q) => $q
-            ->whereJsonContains('roles', $role)
-            ->orWhereJsonContains('visitor_roles', $role));
-    }
-
-    /**
-     * Scope: accessible by at least one of the given roles (operator or visitor).
-     */
-    public function scopeAccessibleByRoles(Builder $query, array $roles): Builder
-    {
-        return $query->where(function (Builder $q) use ($roles) {
-            foreach ($roles as $role) {
-                $q->orWhereJsonContains('roles', $role)
-                  ->orWhereJsonContains('visitor_roles', $role);
-            }
-        });
-    }
 }

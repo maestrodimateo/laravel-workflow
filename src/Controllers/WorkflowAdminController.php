@@ -11,6 +11,7 @@ use Maestrodimateo\Workflow\Enums\RecipientType;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Circuit;
 use Maestrodimateo\Workflow\Services\MessageVariableResolver;
+use Maestrodimateo\Workflow\Resources\CircuitResource;
 use Maestrodimateo\Workflow\Traits\Workflowable;
 use Maestrodimateo\Workflow\WorkflowManager;
 use Illuminate\Support\Facades\File;
@@ -21,42 +22,34 @@ class WorkflowAdminController
 {
     public function __invoke(): View
     {
-        $actions = collect(WorkflowManager::getRegisteredActions())
-            ->map(fn ($class, $key) => [
-                'key' => $key,
-                'label' => $class::label(),
-                // Target models this action is limited to; empty = transversal.
-                'models' => WorkflowManager::actionModels($class),
-            ])
-            ->values();
-
-        $conditions = collect(WorkflowManager::getRegisteredConditions())
-            ->map(fn ($class, $key) => [
-                'key' => $key,
-                'label' => $class::label(),
-                'models' => WorkflowManager::actionModels($class),
-            ])
-            ->values();
+        $payload = $this->designerPayload();
 
         return view('workflow::app', [
             'circuits' => Circuit::with('baskets.next', 'baskets.previous', 'baskets.messages', 'messages')->get(),
-            'colors' => collect(AllowedBasketColors::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
-            'msgTypes' => collect(MessageType::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
-            'recipients' => collect(RecipientType::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
-            'actions' => $actions,
-            'conditions' => $conditions,
-            'variables' => MessageVariableResolver::availableKeys(),
+            'colors' => $payload['colors'],
+            'msgTypes' => $payload['messageTypes'],
+            'recipients' => $payload['recipientTypes'],
+            'actions' => $payload['actions'],
+            'conditions' => $payload['conditions'],
+            'variables' => $payload['variables'],
             'apiPrefix' => './admin/api',
-            'workflowableModels' => $this->discoverWorkflowableModels(),
-            'configuredRoles' => config('workflow.roles', []),
+            'workflowableModels' => $payload['workflowableModels'],
+            'configuredRoles' => $payload['configuredRoles'],
         ]);
     }
 
     /**
-     * Expose designer metadata as JSON for SPA frontends (actions, conditions,
-     * colors, message types, recipient types, variables, workflowable models, roles).
+     * Expose designer metadata as JSON for SPA frontends.
      */
     public function config(): JsonResponse
+    {
+        return response()->json($this->designerPayload());
+    }
+
+    /**
+     * Build the shared designer payload (actions, conditions, colors, etc.).
+     */
+    private function designerPayload(): array
     {
         $actions = collect(WorkflowManager::getRegisteredActions())
             ->map(fn ($class, $key) => [
@@ -74,7 +67,7 @@ class WorkflowAdminController
             ])
             ->values();
 
-        return response()->json([
+        return [
             'colors' => collect(AllowedBasketColors::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
             'messageTypes' => collect(MessageType::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
             'recipientTypes' => collect(RecipientType::cases())->map(fn ($c) => ['name' => $c->name, 'value' => $c->value]),
@@ -83,7 +76,7 @@ class WorkflowAdminController
             'variables' => MessageVariableResolver::availableKeys(),
             'workflowableModels' => $this->discoverWorkflowableModels(),
             'configuredRoles' => config('workflow.roles', []),
-        ]);
+        ];
     }
 
     public function baskets(Circuit $circuit): JsonResponse
@@ -247,7 +240,7 @@ class WorkflowAdminController
             @unlink($tempPath);
         }
 
-        return response()->json($circuit, 201);
+        return response()->json(CircuitResource::make($circuit), 201);
     }
 
     /**
