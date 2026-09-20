@@ -1,0 +1,53 @@
+<?php
+
+namespace {{ namespace }};
+
+use Illuminate\Database\Eloquent\Model;
+use Maestrodimateo\Workflow\Contracts\TransitionCondition;
+
+class {{ class }} implements TransitionCondition
+{
+    /**
+     * Clé unique de cette condition (stockée dans le JSON de la transition).
+     */
+    public static function key(): string
+    {
+        return '{{ key }}';
+    }
+
+    /**
+     * Libellé affiché dans l'interface d'administration.
+     */
+    public static function label(): string
+    {
+        return '{{ label }}';
+    }
+
+    /**
+     * Modèles cibles pour cette condition.
+     *
+     * @return array<int, class-string>
+     */
+    public static function models(): array
+    {
+        return [{{ model }}];
+    }
+
+    /**
+     * Vérifie si la transition est autorisée pour ce modèle.
+     * DOIT être sans effet de bord (lecture seule).
+     */
+    public function passes(Model $model, array $config = []): bool
+    {
+        // TODO: implémenter la logique de la condition
+        return true;
+    }
+
+    /**
+     * Raison affichée lorsque la condition bloque la transition.
+     */
+    public function reason(array $config = []): string
+    {
+        return '{{ label }} non satisfaite.';
+    }
+}
