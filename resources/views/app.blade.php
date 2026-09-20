@@ -264,10 +264,11 @@
                 return this.availableActions.filter(a => (!a.models?.length || (tm && a.models.includes(tm))) && !used.has(a.key));
             },
 
-            /** Conditions selectable for the active circuit (transversal + model-scoped). */
+            /** Conditions selectable for the active circuit (transversal + model-scoped, no duplicates). */
             get scopedConditions() {
                 const tm = this.circuit?.targetModel;
-                return this.availableConditions.filter(c => !c.models?.length || (tm && c.models.includes(tm)));
+                const used = new Set(this.tConfig.conditions.map(c => c.type));
+                return this.availableConditions.filter(c => (!c.models?.length || (tm && c.models.includes(tm))) && !used.has(c.key));
             },
 
             /** Baskets that can be linked to from the selected basket (excludes self and existing links) */

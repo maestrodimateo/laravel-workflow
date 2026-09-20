@@ -15,6 +15,8 @@ return [
             'status_placeholder' => 'REVIEW',
             'role_operator' => 'Operator',
             'role_visitor' => 'Visitor',
+            'no_roles' => 'No role selected',
+            'add_role_placeholder' => 'Add a role…',
         ],
 
         'circuit_modal' => [

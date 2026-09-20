@@ -23,7 +23,7 @@
             <div>
                 <div class="flex items-center justify-between mb-2">
                     <label class="text-sm font-medium text-foreground">{{ __('workflow::workflow.ui.transition_modal.actions') }}</label>
-                    <div class="relative" x-data="{addOpen: false}">
+                    <div class="relative" x-data="{addOpen: false}" x-show="scopedActions.length">
                         <button @click="addOpen=!addOpen" class="sh-btn sh-btn-outline h-7 text-xs px-2">
                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             {{ __('workflow::workflow.ui.buttons.add_action') }}
@@ -89,7 +89,7 @@
             <div>
                 <div class="flex items-center justify-between mb-2">
                     <label class="text-sm font-medium text-foreground">{{ __('workflow::workflow.ui.transition_modal.conditions') }}</label>
-                    <div class="relative" x-data="{condOpen: false}">
+                    <div class="relative" x-data="{condOpen: false}" x-show="scopedConditions.length">
                         <button @click="condOpen=!condOpen" class="sh-btn sh-btn-outline h-7 text-xs px-2">
                             <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             {{ __('workflow::workflow.ui.transition_modal.add_condition') }}
@@ -113,32 +113,6 @@
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
                             </div>
-                            {{-- Declarative attribute condition: field / operator / value --}}
-                            <template x-if="condition.type === 'attribute'">
-                                <div x-init="if(!condition.config.op) condition.config.op='='" class="flex items-center gap-2">
-                                    <select x-model="condition.config.field" class="sh-input h-7 text-xs flex-[2]">
-                                        <option value="">{{ __('workflow::workflow.ui.transition_modal.condition_field_placeholder') }}</option>
-                                        <template x-for="attr in modelAttributes" :key="attr">
-                                            <option :value="attr" x-text="attr"></option>
-                                        </template>
-                                    </select>
-                                    <select x-model="condition.config.op" class="sh-input h-7 text-xs flex-1">
-                                        <option value="=">=</option>
-                                        <option value="!=">&ne;</option>
-                                        <option value="<">&lt;</option>
-                                        <option value="<=">&le;</option>
-                                        <option value=">">&gt;</option>
-                                        <option value=">=">&ge;</option>
-                                        <option value="in">in</option>
-                                        <option value="not_in">not in</option>
-                                        <option value="empty">empty</option>
-                                        <option value="not_empty">not empty</option>
-                                        <option value="contains">contains</option>
-                                    </select>
-                                    <input x-model="condition.config.value" x-show="!['empty','not_empty'].includes(condition.config.op)"
-                                           class="sh-input h-7 text-xs flex-[2]" placeholder="{{ __('workflow::workflow.ui.transition_modal.condition_value_placeholder') }}">
-                                </div>
-                            </template>
                         </div>
                     </template>
                 </div>

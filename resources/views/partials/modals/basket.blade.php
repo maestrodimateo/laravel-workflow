@@ -36,18 +36,34 @@
             </div>
             <div x-show="circuitRoles.length">
                 <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.basket_modal.allowed_roles') }}</label>
-                <div class="space-y-1 max-h-40 overflow-y-auto border border-border rounded-md p-2">
-                    <template x-for="r in circuitRoles" :key="r">
-                        <div class="flex items-center gap-2 px-2 py-1">
-                            <span class="text-sm text-foreground flex-1" x-text="r"></span>
-                            <select class="sh-input h-7 text-xs w-28" :value="roleAccess(r)" @change="setRoleAccess(r, $event.target.value)">
-                                <option value="">&mdash;</option>
-                                <option value="operator">{{ __('workflow::workflow.ui.basket_modal.role_operator') }}</option>
-                                <option value="visitor">{{ __('workflow::workflow.ui.basket_modal.role_visitor') }}</option>
-                            </select>
-                        </div>
+                {{-- Selected roles as pills --}}
+                <div class="flex flex-wrap gap-1.5 mb-2 min-h-[24px]">
+                    <template x-for="r in circuitRoles.filter(r => roleAccess(r))" :key="r">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-xs font-medium"
+                              :class="roleAccess(r) === 'operator' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'">
+                            <span x-text="r"></span>
+                            <span class="text-[10px] opacity-60" x-text="roleAccess(r) === 'operator' ? '{{ __('workflow::workflow.ui.basket_modal.role_operator') }}' : '{{ __('workflow::workflow.ui.basket_modal.role_visitor') }}'"></span>
+                            <button type="button" @click="setRoleAccess(r, '')" class="hover:text-destructive">&times;</button>
+                        </span>
                     </template>
+                    <span x-show="!circuitRoles.some(r => roleAccess(r))" class="text-xs text-muted-foreground">{{ __('workflow::workflow.ui.basket_modal.no_roles') ?? 'Aucun rôle sélectionné' }}</span>
                 </div>
+                {{-- Add role select --}}
+                <template x-if="circuitRoles.some(r => !roleAccess(r))">
+                    <div class="flex gap-2">
+                        <select x-ref="roleSelect" class="sh-input flex-1 h-8 text-xs">
+                            <option value="" disabled selected>{{ __('workflow::workflow.ui.basket_modal.add_role_placeholder') ?? 'Ajouter un rôle…' }}</option>
+                            <template x-for="r in circuitRoles.filter(r => !roleAccess(r))" :key="r">
+                                <option :value="r" x-text="r"></option>
+                            </template>
+                        </select>
+                        <select x-ref="roleType" class="sh-input h-8 text-xs w-28">
+                            <option value="operator">{{ __('workflow::workflow.ui.basket_modal.role_operator') }}</option>
+                            <option value="visitor">{{ __('workflow::workflow.ui.basket_modal.role_visitor') }}</option>
+                        </select>
+                        <button type="button" @click="if($refs.roleSelect.value){setRoleAccess($refs.roleSelect.value,$refs.roleType.value);$refs.roleSelect.value='';}" class="sh-btn sh-btn-primary h-8 px-3 text-xs">+</button>
+                    </div>
+                </template>
             </div>
             <div x-show="baskets.filter(x => editId ? x.id !== editId : true).length">
                 <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.basket_modal.previous_baskets') }}</label>

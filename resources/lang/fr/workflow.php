@@ -15,6 +15,8 @@ return [
             'status_placeholder' => 'REVIEW',
             'role_operator' => 'Opérateur',
             'role_visitor' => 'Visiteur',
+            'no_roles' => 'Aucun rôle sélectionné',
+            'add_role_placeholder' => 'Ajouter un rôle…',
         ],
 
         'circuit_modal' => [
