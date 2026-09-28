@@ -20,7 +20,8 @@
       x-data="app()" x-init="boot()"
       @keydown.escape.window="if(modal)modal=null"
       @keydown.delete.window="onDeleteSelected($event)"
-      @keydown.backspace.window="onDeleteSelected($event)">
+      @keydown.backspace.window="onDeleteSelected($event)"
+      @keydown.window="onGlobalKeydown($event)">
 
     {{-- Hidden file input for circuit import --}}
     <input type="file" accept=".json" x-ref="importInput" class="hidden" @change="importCircuit($event)">
@@ -220,7 +221,7 @@
             // =================================================================
 
             /** @type {Object} Circuit create/edit form data */
-            circuitForm: { name: '', targetModel: '', description: '', roles: [] },
+            circuitForm: { name: '', targetModel: '', description: '', rolesInput: '' },
 
             /** @type {Object} Basket create/edit form data */
             basketForm: { name: '', status: '', color: '', circuit_id: '', roles: [], visitor_roles: [], previous: [] },
@@ -1389,7 +1390,7 @@
 
             openCircuitModal() {
                 this.editingId = null;
-                this.circuitForm = { name: '', targetModel: '', description: '', roles: [] };
+                this.circuitForm = { name: '', targetModel: '', description: '', rolesInput: '' };
                 this.validationErrors = {};
                 this.activeModal = 'circuit';
             },
@@ -1400,34 +1401,31 @@
                     name: this.circuit.name,
                     targetModel: this.circuit.targetModel,
                     description: this.circuit.description || '',
-                    roles: [...(this.circuit.roles || [])],
+                    rolesInput: (this.circuit.roles || []).join(', '),
                 };
                 this.validationErrors = {};
                 this.activeModal = 'circuit';
             },
 
-            /** Add a role to the circuit form from the input field */
-            addCR() {
-                const value = this.$refs.crI.value.trim();
-                if (value && !this.circuitForm.roles.includes(value)) {
-                    this.circuitForm.roles.push(value);
-                }
-                this.$refs.crI.value = '';
-            },
-
             async saveCircuit() {
                 this.isLoading = true;
+                const payload = {
+                    name: this.circuitForm.name,
+                    targetModel: this.circuitForm.targetModel,
+                    description: this.circuitForm.description,
+                    roles: this.circuitForm.rolesInput.split(',').map(r => r.trim()).filter(Boolean),
+                };
                 try {
                     if (this.editingId) {
-                        await this.api('PUT', '/circuits/' + this.editingId, this.circuitForm);
+                        await this.api('PUT', '/circuits/' + this.editingId, payload);
                         const index = this.circuits.findIndex(c => c.id === this.editingId);
                         if (index !== -1) {
-                            Object.assign(this.circuits[index], this.circuitForm);
+                            Object.assign(this.circuits[index], payload);
                             this.circuit = { ...this.circuits[index] };
                         }
                         this.showToast(this.t('notifications.circuit_updated'));
                     } else {
-                        const response = await this.api('POST', '/circuits', this.circuitForm);
+                        const response = await this.api('POST', '/circuits', payload);
                         const created = response.circuit?.data || response.circuit || response.data || response;
 
                         // Reload the circuit with its auto-created DRAFT basket
@@ -1599,6 +1597,14 @@
              * any input, textarea, Quill editor or open modal, so typing is safe.
              * param: {KeyboardEvent} event
              */
+            /** Keyboard shortcuts: Ctrl/⌘ + Plus/Minus/0 for zoom */
+            onGlobalKeydown(e) {
+                if (!(e.ctrlKey || e.metaKey)) return;
+                if (e.key === '+' || e.key === '=') { e.preventDefault(); this.setZoom(this.zoomLevel + 0.1); }
+                else if (e.key === '-') { e.preventDefault(); this.setZoom(this.zoomLevel - 0.1); }
+                else if (e.key === '0') { e.preventDefault(); this.setZoom(1); }
+            },
+
             onDeleteSelected(event) {
                 const el = document.activeElement;
                 const tag = (el?.tagName || '').toLowerCase();

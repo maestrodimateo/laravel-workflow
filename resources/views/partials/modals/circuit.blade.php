@@ -32,31 +32,7 @@
             </div>
             <div>
                 <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.circuit_modal.allowed_roles') }}</label>
-                {{-- Checkboxes when roles are configured, free-text input otherwise --}}
-                <template x-if="configuredRoles.length">
-                    <div class="space-y-1 max-h-40 overflow-y-auto border border-border rounded-md p-2">
-                        <template x-for="r in configuredRoles" :key="r">
-                            <label class="flex items-center gap-2 px-2 py-1 hover:bg-accent rounded-sm cursor-pointer">
-                                <input type="checkbox" :checked="cForm.roles.includes(r)" @change="toggleArr(cForm.roles, r)" class="rounded border-border">
-                                <span class="text-sm text-foreground" x-text="r"></span>
-                            </label>
-                        </template>
-                    </div>
-                </template>
-                <template x-if="!configuredRoles.length">
-                    <div>
-                        <div class="flex flex-wrap gap-1 mb-2 min-h-[24px]">
-                            <template x-for="(r,i) in cForm.roles" :key="r">
-                                <span class="sh-badge text-xs gap-1"><span x-text="r"></span><button type="button" @click="cForm.roles.splice(i,1)" class="hover:text-destructive">&times;</button></span>
-                            </template>
-                            <span x-show="!cForm.roles.length" class="text-xs text-muted-foreground">{{ __('workflow::workflow.ui.circuit_modal.no_roles') }}</span>
-                        </div>
-                        <div class="flex gap-2">
-                            <input x-ref="crI" type="text" placeholder="{{ __('workflow::workflow.ui.circuit_modal.add_role_placeholder') }}" @keydown.enter.prevent="addCR()" class="sh-input flex-1">
-                            <button type="button" @click="addCR()" class="sh-btn sh-btn-primary h-9 px-3">+</button>
-                        </div>
-                    </div>
-                </template>
+                <input x-model="cForm.rolesInput" class="sh-input w-full" placeholder="admin, manager">
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" @click="modal=null" class="sh-btn sh-btn-outline h-9">{{ __('workflow::workflow.ui.buttons.cancel') }}</button>

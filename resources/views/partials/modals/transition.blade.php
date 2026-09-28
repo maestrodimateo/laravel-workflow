@@ -21,102 +21,49 @@
             </div>
 
             <div>
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-sm font-medium text-foreground">{{ __('workflow::workflow.ui.transition_modal.actions') }}</label>
-                    <div class="relative" x-data="{addOpen: false}" x-show="scopedActions.length">
-                        <button @click="addOpen=!addOpen" class="sh-btn sh-btn-outline h-7 text-xs px-2">
-                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            {{ __('workflow::workflow.ui.buttons.add_action') }}
-                        </button>
-                        <div x-show="addOpen" @click.away="addOpen=false" x-cloak
-                             class="absolute right-0 top-full mt-1 w-48 bg-card rounded-md border border-border shadow-md py-1 z-50">
-                            <template x-for="a in scopedActions" :key="a.key">
-                                <button @click="addTransitionAction(a.key);addOpen=false"
-                                        class="w-full text-left px-3 py-1.5 text-sm hover:bg-accent text-foreground" x-text="a.label"></button>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-
+                <h4 class="text-sm font-semibold text-foreground mb-2">{{ __('workflow::workflow.ui.transition_modal.actions') }}</h4>
                 <div class="space-y-2" x-show="tConfig.actions.length">
                     <template x-for="(action, i) in tConfig.actions" :key="i">
-                        <div class="bg-muted rounded-md px-4 py-3 border border-border">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs font-semibold text-foreground" x-text="actionLabel(action.type)"></span>
-                                <button @click="tConfig.actions.splice(i,1)" class="sh-btn sh-btn-ghost h-6 w-6 p-0 hover:!text-destructive">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                            </div>
-                            <template x-if="action.type === 'webhook'">
-                                <input x-model="action.config.url" class="sh-input w-full h-7 text-xs" placeholder="{{ __('workflow::workflow.ui.transition_modal.webhook_url_placeholder') }}">
-                            </template>
-                            <template x-if="action.type === 'log'">
-                                <input x-model="action.config.message" class="sh-input w-full h-7 text-xs" placeholder="{{ __('workflow::workflow.ui.transition_modal.log_message_placeholder') }}">
-                            </template>
-                            <template x-if="action.type === 'send_email'">
-                                <select x-model="action.config.message_id" class="sh-input w-full h-7 text-xs">
-                                    <option value="">{{ __('workflow::workflow.ui.transition_modal.select_message') }}</option>
-                                    <template x-for="m in circuitMessages" :key="m.id"><option :value="m.id" x-text="m.subject"></option></template>
-                                </select>
-                            </template>
-                            <template x-if="action.type === 'require_document'">
-                                <div x-init="if(!action.config.documents) action.config.documents = []">
-                                    {{-- List of required documents --}}
-                                    <div class="space-y-1.5 mb-2" x-show="action.config.documents?.length">
-                                        <template x-for="(doc, di) in action.config.documents" :key="di">
-                                            <div class="flex items-center gap-2">
-                                                <input x-model="doc.type" class="sh-input h-7 text-xs flex-1" placeholder="{{ __('workflow::workflow.ui.transition_modal.document_type_placeholder') }}">
-                                                <input x-model="doc.label" class="sh-input h-7 text-xs flex-[2]" placeholder="{{ __('workflow::workflow.ui.transition_modal.document_label_placeholder') }}">
-                                                <button @click="action.config.documents.splice(di,1)" class="sh-btn sh-btn-ghost h-7 w-7 p-0 shrink-0 hover:!text-destructive">
-                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                                </button>
-                                            </div>
-                                        </template>
-                                    </div>
-                                    <button @click="action.config.documents.push({type:'',label:''})" class="sh-btn sh-btn-outline h-7 text-xs w-full">
-                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                                        {{ __('workflow::workflow.ui.transition_modal.add_document_button') }}
-                                    </button>
-                                </div>
-                            </template>
+                        <div class="flex items-center gap-2">
+                            <select x-model="action.type" class="sh-input flex-1 h-8 text-xs">
+                                <option value="" disabled>{{ __('workflow::workflow.ui.transition_modal.select_action') ?? 'Sélectionner une action' }}</option>
+                                <template x-for="a in scopedActions" :key="a.key">
+                                    <option :value="a.key" :disabled="a.key !== action.type && tConfig.actions.some(x => x.type === a.key)" x-text="a.label"></option>
+                                </template>
+                            </select>
+                            <button type="button" @click="tConfig.actions.splice(i,1)" class="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-accent">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 6L6 18M6 6l12 12"/></svg>
+                            </button>
                         </div>
                     </template>
                 </div>
-                <p x-show="!tConfig.actions.length" class="text-xs text-muted-foreground">{{ __('workflow::workflow.ui.transition_modal.no_actions') }}</p>
+                <button x-show="tConfig.actions.length < scopedActions.length" type="button" @click="tConfig.actions.push({type:'',config:{}})" class="sh-btn sh-btn-outline h-7 text-xs mt-2">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    {{ __('workflow::workflow.ui.buttons.add_action') }}
+                </button>
             </div>
 
-            {{-- Conditions (guards) — gate the transition on the model's state --}}
             <div>
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-sm font-medium text-foreground">{{ __('workflow::workflow.ui.transition_modal.conditions') }}</label>
-                    <div class="relative" x-data="{condOpen: false}" x-show="scopedConditions.length">
-                        <button @click="condOpen=!condOpen" class="sh-btn sh-btn-outline h-7 text-xs px-2">
-                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            {{ __('workflow::workflow.ui.transition_modal.add_condition') }}
-                        </button>
-                        <div x-show="condOpen" @click.away="condOpen=false" x-cloak
-                             class="absolute right-0 top-full mt-1 w-48 bg-card rounded-md border border-border shadow-md py-1 z-50">
-                            <template x-for="c in scopedConditions" :key="c.key">
-                                <button @click="addTransitionCondition(c.key);condOpen=false"
-                                        class="w-full text-left px-3 py-1.5 text-sm hover:bg-accent text-foreground" x-text="c.label"></button>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-
+                <h4 class="text-sm font-semibold text-foreground mb-2">{{ __('workflow::workflow.ui.transition_modal.conditions') }}</h4>
                 <div class="space-y-2" x-show="tConfig.conditions.length">
                     <template x-for="(condition, i) in tConfig.conditions" :key="i">
-                        <div class="bg-muted rounded-md px-4 py-3 border border-border">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs font-semibold text-foreground" x-text="conditionLabel(condition.type)"></span>
-                                <button @click="tConfig.conditions.splice(i,1)" class="sh-btn sh-btn-ghost h-6 w-6 p-0 hover:!text-destructive">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                </button>
-                            </div>
+                        <div class="flex items-center gap-2">
+                            <select x-model="condition.type" class="sh-input flex-1 h-8 text-xs">
+                                <option value="" disabled>{{ __('workflow::workflow.ui.transition_modal.select_condition') ?? 'Sélectionner une condition' }}</option>
+                                <template x-for="c in scopedConditions" :key="c.key">
+                                    <option :value="c.key" :disabled="c.key !== condition.type && tConfig.conditions.some(x => x.type === c.key)" x-text="c.label"></option>
+                                </template>
+                            </select>
+                            <button type="button" @click="tConfig.conditions.splice(i,1)" class="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-accent">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 6L6 18M6 6l12 12"/></svg>
+                            </button>
                         </div>
                     </template>
                 </div>
-                <p x-show="!tConfig.conditions.length" class="text-xs text-muted-foreground">{{ __('workflow::workflow.ui.transition_modal.no_conditions') }}</p>
+                <button x-show="tConfig.conditions.length < scopedConditions.length" type="button" @click="tConfig.conditions.push({type:'',config:{}})" class="sh-btn sh-btn-outline h-7 text-xs mt-2">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    {{ __('workflow::workflow.ui.transition_modal.add_condition') }}
+                </button>
             </div>
         </div>
 

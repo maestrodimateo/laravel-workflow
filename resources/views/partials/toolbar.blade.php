@@ -10,13 +10,6 @@
     </div>
 
     <div class="flex items-center gap-1.5">
-        {{-- Linking indicator --}}
-        <span x-show="linking" x-cloak class="sh-badge text-xs animate-pulse">
-            <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-            {{ __('workflow::workflow.ui.toolbar.linking_mode') }}
-            <button @click="linking=null" class="underline ml-1">{{ __('workflow::workflow.ui.toolbar.cancel_link') }}</button>
-        </span>
-
         {{-- Zoom --}}
         <div class="flex items-center border border-border rounded-md overflow-hidden h-8">
             <button @click="setZoom(zoom-0.1)" class="px-2 h-full text-muted-foreground hover:bg-accent text-xs">-</button>

@@ -11,17 +11,15 @@
             <p class="text-xs text-muted-foreground mt-0.5">{{ __('workflow::workflow.ui.basket_modal.subtitle') }}</p>
         </div>
         <form @submit.prevent="saveBasket()" class="p-6 space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.basket_modal.name') }}</label>
-                    <input x-model="bForm.name" required class="sh-input w-full" placeholder="{{ __('workflow::workflow.ui.basket_modal.name_placeholder') }}">
-                    <p x-show="errs.name" x-text="errs.name" class="text-destructive text-xs mt-1"></p>
-                </div>
-                <div>
-                    <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.basket_modal.status') }}</label>
-                    <input x-model="bForm.status" required class="sh-input w-full font-mono uppercase" placeholder="{{ __('workflow::workflow.ui.basket_modal.status_placeholder') }}">
-                    <p x-show="errs.status" x-text="errs.status" class="text-destructive text-xs mt-1"></p>
-                </div>
+            <div>
+                <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.basket_modal.name') }}</label>
+                <input x-model="bForm.name" required class="sh-input w-full" placeholder="{{ __('workflow::workflow.ui.basket_modal.name_placeholder') }}">
+                <p x-show="errs.name" x-text="errs.name" class="text-destructive text-xs mt-1"></p>
+            </div>
+            <div>
+                <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.basket_modal.status') }}</label>
+                <input x-model="bForm.status" required class="sh-input w-full font-mono uppercase" placeholder="{{ __('workflow::workflow.ui.basket_modal.status_placeholder') }}">
+                <p x-show="errs.status" x-text="errs.status" class="text-destructive text-xs mt-1"></p>
             </div>
             <div>
                 <label class="text-sm font-medium text-foreground mb-2 block">{{ __('workflow::workflow.ui.basket_modal.color') }}</label>
@@ -64,18 +62,6 @@
                         <button type="button" @click="if($refs.roleSelect.value){setRoleAccess($refs.roleSelect.value,$refs.roleType.value);$refs.roleSelect.value='';}" class="sh-btn sh-btn-primary h-8 px-3 text-xs">+</button>
                     </div>
                 </template>
-            </div>
-            <div x-show="baskets.filter(x => editId ? x.id !== editId : true).length">
-                <label class="text-sm font-medium text-foreground mb-1.5 block">{{ __('workflow::workflow.ui.basket_modal.previous_baskets') }}</label>
-                <div class="space-y-1 max-h-32 overflow-y-auto border border-border rounded-md p-2">
-                    <template x-for="x in baskets.filter(x => editId ? x.id !== editId : true)" :key="x.id">
-                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-accent rounded-sm cursor-pointer">
-                            <input type="checkbox" :checked="bForm.previous.includes(x.id)" @change="toggleArr(bForm.previous, x.id)" class="rounded border-border">
-                            <div class="w-2 h-2 rounded-full shrink-0" :style="'background:' + color(x.color)"></div>
-                            <span class="text-sm text-foreground" x-text="x.name + ' (' + x.status + ')'"></span>
-                        </label>
-                    </template>
-                </div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" @click="modal=null" class="sh-btn sh-btn-outline h-9">{{ __('workflow::workflow.ui.buttons.cancel') }}</button>
