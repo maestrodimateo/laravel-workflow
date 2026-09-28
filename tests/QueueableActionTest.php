@@ -31,7 +31,7 @@ class SyncFlagAction implements TransitionAction
         return 'Sync flag';
     }
 
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], \Maestrodimateo\Workflow\Support\TransitionContext $context = new \Maestrodimateo\Workflow\Support\TransitionContext): void
     {
         self::$invocations[] = $model->getKey();
     }
@@ -65,7 +65,7 @@ class QueueableFlagAction implements QueueableAction, TransitionAction
         return null;
     }
 
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], \Maestrodimateo\Workflow\Support\TransitionContext $context = new \Maestrodimateo\Workflow\Support\TransitionContext): void
     {
         self::$invocations[] = $model->getKey();
     }
@@ -90,7 +90,7 @@ class AfterCommitFlagAction implements AfterCommitAction, TransitionAction
         return 'After commit flag';
     }
 
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], \Maestrodimateo\Workflow\Support\TransitionContext $context = new \Maestrodimateo\Workflow\Support\TransitionContext): void
     {
         self::$invocations[] = $model->getKey();
     }

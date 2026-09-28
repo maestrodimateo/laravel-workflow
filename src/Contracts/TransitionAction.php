@@ -4,6 +4,7 @@ namespace Maestrodimateo\Workflow\Contracts;
 
 use Illuminate\Database\Eloquent\Model;
 use Maestrodimateo\Workflow\Models\Basket;
+use Maestrodimateo\Workflow\Support\TransitionContext;
 
 interface TransitionAction
 {
@@ -19,6 +20,8 @@ interface TransitionAction
 
     /**
      * Execute the action during a transition.
+     *
+     * @param  TransitionContext  $context  Shared bag — read/write data for other actions in the same transition.
      */
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void;
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], TransitionContext $context = new TransitionContext): void;
 }

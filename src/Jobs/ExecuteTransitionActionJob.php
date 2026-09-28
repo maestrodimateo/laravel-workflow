@@ -88,16 +88,9 @@ class ExecuteTransitionActionJob implements ShouldQueue
      */
     public function handle(): void
     {
-        // Rebind the context snapshot so transition_context() works on the worker.
-        $context = new TransitionContext;
-        foreach ($this->contextSnapshot as $k => $v) {
-            $context->set($k, $v);
-        }
-        app()->instance(TransitionContext::class, $context);
-
         /** @var TransitionAction $action */
         $action = app($this->actionClass);
-        $action->execute($this->subject, $this->from, $this->to, $this->config);
+        $action->execute($this->subject, $this->from, $this->to, $this->config, new TransitionContext($this->contextSnapshot));
     }
 
     /**

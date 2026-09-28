@@ -9,6 +9,7 @@ use Maestrodimateo\Workflow\Contracts\QueueableAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Exceptions\UnsafeWebhookUrlException;
 use Maestrodimateo\Workflow\Models\Basket;
+use Maestrodimateo\Workflow\Support\TransitionContext;
 use Maestrodimateo\Workflow\Support\WebhookGuard;
 
 class WebhookAction implements QueueableAction, TransitionAction
@@ -37,7 +38,7 @@ class WebhookAction implements QueueableAction, TransitionAction
      * @throws ConnectionException
      * @throws UnsafeWebhookUrlException If the URL targets a disallowed or non-public host
      */
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], TransitionContext $context = new TransitionContext): void
     {
         $url = $config['url'] ?? null;
 

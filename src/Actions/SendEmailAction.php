@@ -10,6 +10,7 @@ use Maestrodimateo\Workflow\Emails\TransitionMail;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Models\Message;
 use Maestrodimateo\Workflow\Services\MessageVariableResolver;
+use Maestrodimateo\Workflow\Support\TransitionContext;
 
 class SendEmailAction implements QueueableAction, TransitionAction
 {
@@ -33,7 +34,7 @@ class SendEmailAction implements QueueableAction, TransitionAction
         return null;
     }
 
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], TransitionContext $context = new TransitionContext): void
     {
         $messageId = $config['message_id'] ?? null;
 

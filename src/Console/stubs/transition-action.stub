@@ -5,6 +5,7 @@ namespace {{ namespace }};
 use Illuminate\Database\Eloquent\Model;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Models\Basket;
+use Maestrodimateo\Workflow\Support\TransitionContext;
 
 class {{ class }} implements TransitionAction
 {
@@ -41,12 +42,13 @@ class {{ class }} implements TransitionAction
     /**
      * Execute the action during a transition.
      *
-     * @param  Model  $model   The model being transitioned
-     * @param  Basket $from    Source basket
-     * @param  Basket $to      Target basket
-     * @param  array  $config  Configuration from the admin UI
+     * @param  Model              $model    The model being transitioned
+     * @param  Basket             $from     Source basket
+     * @param  Basket             $to       Target basket
+     * @param  array              $config   Configuration from the admin UI
+     * @param  TransitionContext  $context  Shared bag — read/write data for other actions
      */
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], TransitionContext $context = new TransitionContext): void
     {
         //
     }

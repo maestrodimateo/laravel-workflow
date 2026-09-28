@@ -29,7 +29,7 @@ class BoomAction implements TransitionAction
         return 'Boom';
     }
 
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], \Maestrodimateo\Workflow\Support\TransitionContext $context = new \Maestrodimateo\Workflow\Support\TransitionContext): void
     {
         throw new RuntimeException('boom');
     }
@@ -180,7 +180,7 @@ class DocOnlyAction implements TransitionAction
         return [Document::class];
     }
 
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], \Maestrodimateo\Workflow\Support\TransitionContext $context = new \Maestrodimateo\Workflow\Support\TransitionContext): void
     {
         //
     }

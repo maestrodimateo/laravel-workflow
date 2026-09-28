@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Exceptions\MissingDocumentsException;
 use Maestrodimateo\Workflow\Models\Basket;
+use Maestrodimateo\Workflow\Support\TransitionContext;
 
 class RequireDocumentAction implements TransitionAction
 {
@@ -19,7 +20,7 @@ class RequireDocumentAction implements TransitionAction
         return 'Require documents';
     }
 
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], TransitionContext $context = new TransitionContext): void
     {
         $documents = $config['documents'] ?? [];
 

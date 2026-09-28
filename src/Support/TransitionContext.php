@@ -5,12 +5,11 @@ namespace Maestrodimateo\Workflow\Support;
 /**
  * Shared bag passed to every action during a single transition.
  *
- * Actions that implement ContextAwareAction can read/write here
- * so downstream actions can access upstream results.
+ * Upstream actions write with set(), downstream actions read with get().
  */
 class TransitionContext
 {
-    protected array $data = [];
+    public function __construct(protected array $data = []) {}
 
     public function set(string $key, mixed $value): static
     {

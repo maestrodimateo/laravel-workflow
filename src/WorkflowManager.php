@@ -493,10 +493,7 @@ class WorkflowManager
     protected function executeTransitionActions(Basket $from, Basket $to): void
     {
         $actions = $this->decodeTransitionActions($from, $to);
-
-        // Bind a shared TransitionContext for this transition.
-        // Any action can call transition_context()->get/set() without setup.
-        app()->instance(TransitionContext::class, new TransitionContext);
+        $context = new TransitionContext;
 
         foreach ($actions as $actionConfig) {
             $key = $actionConfig['type'] ?? null;
@@ -513,7 +510,7 @@ class WorkflowManager
             if ($action instanceof QueueableAction) {
                 $queue = $actionClass::queue() ?? config('workflow.actions_queue.queue');
                 $connection = $actionClass::connection() ?? config('workflow.actions_queue.connection');
-                $contextSnapshot = app(TransitionContext::class)->all();
+                $contextSnapshot = $context->all();
 
                 DB::afterCommit(function () use ($actionClass, $subject, $from, $to, $config, $queue, $connection, $contextSnapshot) {
                     $job = ExecuteTransitionActionJob::dispatch($actionClass, $subject, $from, $to, $config, $contextSnapshot);
@@ -527,9 +524,10 @@ class WorkflowManager
                     }
                 });
             } elseif ($action instanceof AfterCommitAction) {
-                DB::afterCommit(fn () => $action->execute($subject, $from, $to, $config));
+                $contextSnapshot = $context->all();
+                DB::afterCommit(fn () => $action->execute($subject, $from, $to, $config, new TransitionContext($contextSnapshot)));
             } else {
-                $action->execute($subject, $from, $to, $config);
+                $action->execute($subject, $from, $to, $config, $context);
             }
         }
     }

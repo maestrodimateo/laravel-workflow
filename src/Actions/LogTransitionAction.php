@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Maestrodimateo\Workflow\Contracts\AfterCommitAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Models\Basket;
+use Maestrodimateo\Workflow\Support\TransitionContext;
 
 class LogTransitionAction implements TransitionAction, AfterCommitAction
 {
@@ -20,7 +21,7 @@ class LogTransitionAction implements TransitionAction, AfterCommitAction
         return 'Log transition';
     }
 
-    public function execute(Model $model, Basket $from, Basket $to, array $config = []): void
+    public function execute(Model $model, Basket $from, Basket $to, array $config = [], TransitionContext $context = new TransitionContext): void
     {
         $channel = $config['channel'] ?? null;
 
