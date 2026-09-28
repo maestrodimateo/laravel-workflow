@@ -9,8 +9,10 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Maestrodimateo\Workflow\Contracts\ContextAwareAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Models\Basket;
+use Maestrodimateo\Workflow\Support\TransitionContext;
 use Maestrodimateo\Workflow\WorkflowManager;
 use Throwable;
 
@@ -66,6 +68,7 @@ class ExecuteTransitionActionJob implements ShouldQueue
         public Basket $from,
         public Basket $to,
         public array $config = [],
+        public array $contextSnapshot = [],
     ) {
         $this->tries = (int) config('workflow.actions_queue.tries', 3);
         $this->timeout = (int) config('workflow.actions_queue.timeout', 30);
@@ -88,6 +91,14 @@ class ExecuteTransitionActionJob implements ShouldQueue
     {
         /** @var TransitionAction $action */
         $action = app($this->actionClass);
+
+        if ($action instanceof ContextAwareAction) {
+            $context = new TransitionContext;
+            foreach ($this->contextSnapshot as $k => $v) {
+                $context->set($k, $v);
+            }
+            $action->setContext($context);
+        }
 
         $action->execute($this->subject, $this->from, $this->to, $this->config);
     }
