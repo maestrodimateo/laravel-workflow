@@ -9,7 +9,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Maestrodimateo\Workflow\Contracts\ContextAwareAction;
 use Maestrodimateo\Workflow\Contracts\TransitionAction;
 use Maestrodimateo\Workflow\Models\Basket;
 use Maestrodimateo\Workflow\Support\TransitionContext;
@@ -89,17 +88,15 @@ class ExecuteTransitionActionJob implements ShouldQueue
      */
     public function handle(): void
     {
+        // Rebind the context snapshot so transition_context() works on the worker.
+        $context = new TransitionContext;
+        foreach ($this->contextSnapshot as $k => $v) {
+            $context->set($k, $v);
+        }
+        app()->instance(TransitionContext::class, $context);
+
         /** @var TransitionAction $action */
         $action = app($this->actionClass);
-
-        if ($action instanceof ContextAwareAction) {
-            $context = new TransitionContext;
-            foreach ($this->contextSnapshot as $k => $v) {
-                $context->set($k, $v);
-            }
-            $action->setContext($context);
-        }
-
         $action->execute($this->subject, $this->from, $this->to, $this->config);
     }
 
